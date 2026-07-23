@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Filament\Pages;
 
+use BackedEnum;
+use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
+use Filament\Panel;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Contracts\Support\Htmlable;
 use LaBoiteACode\DependencyGraph\Application\SearchDependencyGraph;
 use LaBoiteACode\DependencyGraph\Contracts\DependencyGraphManager;
 use LaBoiteACode\DependencyGraph\DependencyGraphPlugin;
@@ -24,6 +29,7 @@ use LaBoiteACode\DependencyGraph\Support\SearchNormalizer;
 use Livewire\Attributes\Url;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
+use UnitEnum;
 
 class DependencyGraphPage extends Page
 {
@@ -91,22 +97,133 @@ class DependencyGraphPage extends Page
 
     public static function shouldRegisterNavigation(): bool
     {
+        $registered = DependencyGraphPlugin::current()?->isNavigationRegistered()
+            ?? static::packageConfig('navigation.register');
+
+        if ($registered === false) {
+            return false;
+        }
+
         return static::canAccess();
     }
 
     public static function getNavigationLabel(): string
     {
-        return __('filament-dependency-graph::graph.navigation_label');
+        $label = DependencyGraphPlugin::current()?->getNavigationLabel()
+            ?? static::packageConfigString('navigation.label');
+
+        return $label ?? __('filament-dependency-graph::graph.navigation_label');
     }
 
-    public static function getNavigationIcon(): string
+    public static function getNavigationIcon(): string|BackedEnum|Htmlable|null
     {
-        return 'heroicon-o-share';
+        $icon = DependencyGraphPlugin::current()?->getNavigationIcon()
+            ?? static::packageConfigString('navigation.icon');
+
+        return $icon ?? 'heroicon-o-share';
+    }
+
+    public static function getActiveNavigationIcon(): string|BackedEnum|Htmlable|null
+    {
+        $icon = DependencyGraphPlugin::current()?->getActiveNavigationIcon()
+            ?? static::packageConfigString('navigation.active_icon');
+
+        return $icon ?? static::getNavigationIcon();
+    }
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        $group = DependencyGraphPlugin::current()?->getNavigationGroup();
+
+        if ($group !== null) {
+            return $group;
+        }
+
+        $configured = static::packageConfig('navigation.group');
+
+        if ($configured instanceof UnitEnum) {
+            return $configured;
+        }
+
+        return is_string($configured) && $configured !== '' ? $configured : null;
+    }
+
+    public static function getNavigationParentItem(): ?string
+    {
+        return DependencyGraphPlugin::current()?->getNavigationParentItem()
+            ?? static::packageConfigString('navigation.parent_item');
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        $sort = DependencyGraphPlugin::current()?->getNavigationSort()
+            ?? static::packageConfig('navigation.sort');
+
+        return is_numeric($sort) ? (int) $sort : null;
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return DependencyGraphPlugin::current()?->getNavigationBadge();
+    }
+
+    public static function getSlug(?Panel $panel = null): string
+    {
+        $slug = DependencyGraphPlugin::current()?->getPageSlug()
+            ?? static::packageConfigString('page.slug');
+
+        return $slug ?? parent::getSlug($panel);
+    }
+
+    /**
+     * @return class-string<Cluster>|null
+     */
+    public static function getCluster(): ?string
+    {
+        $cluster = DependencyGraphPlugin::current()?->getPageCluster()
+            ?? static::packageConfigString('page.cluster');
+
+        if ($cluster === null || ! is_subclass_of($cluster, Cluster::class)) {
+            return null;
+        }
+
+        return $cluster;
+    }
+
+    public function getMaxContentWidth(): Width|string|null
+    {
+        $width = DependencyGraphPlugin::current()?->getMaxContentWidth()
+            ?? static::packageConfigString('page.max_content_width');
+
+        if ($width instanceof Width) {
+            return $width;
+        }
+
+        if ($width !== null) {
+            return Width::tryFrom($width) ?? $width;
+        }
+
+        return parent::getMaxContentWidth();
     }
 
     public function getTitle(): string
     {
-        return __('filament-dependency-graph::graph.title');
+        $label = DependencyGraphPlugin::current()?->getNavigationLabel()
+            ?? static::packageConfigString('navigation.label');
+
+        return $label ?? __('filament-dependency-graph::graph.title');
+    }
+
+    protected static function packageConfig(string $key): mixed
+    {
+        return app(Repository::class)->get('filament-dependency-graph.' . $key);
+    }
+
+    protected static function packageConfigString(string $key): ?string
+    {
+        $value = static::packageConfig($key);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     public function mount(): void

@@ -21,6 +21,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Navigation
+    |--------------------------------------------------------------------------
+    |
+    | Every entry can also be set fluently on the plugin, which then wins over
+    | this file: navigationLabel(), navigationIcon(), activeNavigationIcon(),
+    | navigationGroup(), navigationSort(), navigationParentItem(),
+    | navigationBadge() and registerNavigation().
+    |
+    */
+
+    'navigation' => [
+        // Defaults to the translated "Dependency Graph" label.
+        'label' => null,
+        'icon' => 'heroicon-o-share',
+        'active_icon' => null,
+        'group' => null,
+        'sort' => null,
+        'parent_item' => null,
+        'register' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Page
+    |--------------------------------------------------------------------------
+    |
+    | The page renders full width by default so large graphs get the whole
+    | viewport. Accepts any Filament\Support\Enums\Width value ('full', '7xl',
+    | 'screen-2xl', ...) or null to fall back to the panel default. The page
+    | can also live inside a cluster and under a custom slug.
+    |
+    */
+
+    'page' => [
+        'slug' => 'dependency-graph',
+        'cluster' => null,
+        'max_content_width' => 'full',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Scopes
     |--------------------------------------------------------------------------
     |

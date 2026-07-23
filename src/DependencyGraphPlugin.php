@@ -7,6 +7,7 @@ namespace LaBoiteACode\DependencyGraph;
 use Closure;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Config\Repository;
 use LaBoiteACode\DependencyGraph\Compatibility\FilamentAdapter;
 use LaBoiteACode\DependencyGraph\Contracts\GraphExporter;
@@ -16,12 +17,35 @@ use LaBoiteACode\DependencyGraph\Export\ExportManager;
 use LaBoiteACode\DependencyGraph\Filament\Pages\DependencyGraphPage;
 use LaBoiteACode\DependencyGraph\Inspection\DefaultNodeInspector;
 use Throwable;
+use UnitEnum;
 
 class DependencyGraphPlugin implements Plugin
 {
     public const ID = 'filament-dependency-graph';
 
     protected ?Closure $visible = null;
+
+    protected string|Closure|null $navigationLabel = null;
+
+    protected ?string $navigationIcon = null;
+
+    protected ?string $activeNavigationIcon = null;
+
+    protected string|UnitEnum|Closure|null $navigationGroup = null;
+
+    protected ?int $navigationSort = null;
+
+    protected ?string $navigationParentItem = null;
+
+    protected ?Closure $navigationBadge = null;
+
+    protected ?bool $navigationRegistered = null;
+
+    protected ?string $pageSlug = null;
+
+    protected ?string $pageCluster = null;
+
+    protected Width|string|null $maxContentWidth = null;
 
     protected ?GraphScope $defaultScope = null;
 
@@ -82,6 +106,174 @@ class DependencyGraphPlugin implements Plugin
         $this->visible = $callback;
 
         return $this;
+    }
+
+    /**
+     * Alias of visible(), consistent with the other La Boite a Code plugins.
+     */
+    public function canAccessUsing(Closure $callback): static
+    {
+        return $this->visible($callback);
+    }
+
+    public function navigationLabel(string|Closure $label): static
+    {
+        $this->navigationLabel = $label;
+
+        return $this;
+    }
+
+    public function navigationIcon(string $icon): static
+    {
+        $this->navigationIcon = $icon;
+
+        return $this;
+    }
+
+    public function activeNavigationIcon(string $icon): static
+    {
+        $this->activeNavigationIcon = $icon;
+
+        return $this;
+    }
+
+    public function navigationGroup(string|UnitEnum|Closure $group): static
+    {
+        $this->navigationGroup = $group;
+
+        return $this;
+    }
+
+    public function navigationSort(int $sort): static
+    {
+        $this->navigationSort = $sort;
+
+        return $this;
+    }
+
+    public function navigationParentItem(string $item): static
+    {
+        $this->navigationParentItem = $item;
+
+        return $this;
+    }
+
+    /**
+     * The closure returns the badge content, or null to hide it.
+     */
+    public function navigationBadge(Closure $badge): static
+    {
+        $this->navigationBadge = $badge;
+
+        return $this;
+    }
+
+    public function registerNavigation(bool $condition = true): static
+    {
+        $this->navigationRegistered = $condition;
+
+        return $this;
+    }
+
+    public function slug(string $slug): static
+    {
+        $this->pageSlug = $slug;
+
+        return $this;
+    }
+
+    /**
+     * @param  class-string  $cluster
+     */
+    public function cluster(string $cluster): static
+    {
+        $this->pageCluster = $cluster;
+
+        return $this;
+    }
+
+    public function maxContentWidth(Width|string $width): static
+    {
+        $this->maxContentWidth = $width;
+
+        return $this;
+    }
+
+    public function getNavigationLabel(): ?string
+    {
+        $label = $this->navigationLabel instanceof Closure
+            ? call_user_func($this->navigationLabel)
+            : $this->navigationLabel;
+
+        return is_string($label) && $label !== '' ? $label : null;
+    }
+
+    public function getNavigationIcon(): ?string
+    {
+        return $this->navigationIcon;
+    }
+
+    public function getActiveNavigationIcon(): ?string
+    {
+        return $this->activeNavigationIcon;
+    }
+
+    public function getNavigationGroup(): string|UnitEnum|null
+    {
+        $group = $this->navigationGroup instanceof Closure
+            ? call_user_func($this->navigationGroup)
+            : $this->navigationGroup;
+
+        if ($group instanceof UnitEnum) {
+            return $group;
+        }
+
+        return is_string($group) && $group !== '' ? $group : null;
+    }
+
+    public function getNavigationSort(): ?int
+    {
+        return $this->navigationSort;
+    }
+
+    public function getNavigationParentItem(): ?string
+    {
+        return $this->navigationParentItem;
+    }
+
+    public function getNavigationBadge(): ?string
+    {
+        if (! $this->navigationBadge instanceof Closure) {
+            return null;
+        }
+
+        $badge = call_user_func($this->navigationBadge);
+
+        if (is_string($badge) && $badge !== '') {
+            return $badge;
+        }
+
+        return is_int($badge) ? (string) $badge : null;
+    }
+
+    public function isNavigationRegistered(): ?bool
+    {
+        return $this->navigationRegistered;
+    }
+
+    public function getPageSlug(): ?string
+    {
+        return $this->pageSlug;
+    }
+
+    public function getPageCluster(): ?string
+    {
+        return $this->pageCluster;
+    }
+
+    public function getMaxContentWidth(): Width|string|null
+    {
+        return $this->maxContentWidth;
     }
 
     public function defaultScope(GraphScope $scope): static
