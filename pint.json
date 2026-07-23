@@ -1,0 +1,30 @@
+{
+    "preset": "laravel",
+    "exclude": [
+        "dist",
+        "node_modules",
+        "tools"
+    ],
+    "rules": {
+        "declare_strict_types": true,
+        "concat_space": {
+            "spacing": "one"
+        },
+        "fully_qualified_strict_types": true,
+        "global_namespace_import": {
+            "import_classes": true,
+            "import_constants": true,
+            "import_functions": true
+        },
+        "ordered_class_elements": {
+            "order": [
+                "use_trait",
+                "case",
+                "constant",
+                "property",
+                "construct",
+                "method"
+            ]
+        }
+    }
+}

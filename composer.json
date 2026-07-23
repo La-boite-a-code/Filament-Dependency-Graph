@@ -1,0 +1,80 @@
+{
+    "name": "laboiteacode/filament-dependency-graph",
+    "description": "The visual architecture explorer for Filament. Explore models, resources, panels and relationships from one visual workspace.",
+    "license": "MIT",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "filament",
+        "filament-plugin",
+        "graph",
+        "architecture",
+        "eloquent",
+        "dependencies",
+        "visualization"
+    ],
+    "homepage": "https://github.com/la-boite-a-code/filament-dependency-graph",
+    "support": {
+        "issues": "https://github.com/la-boite-a-code/filament-dependency-graph/issues",
+        "source": "https://github.com/la-boite-a-code/filament-dependency-graph"
+    },
+    "authors": [
+        {
+            "name": "La Boite a Code",
+            "email": "alexandre@laboiteacode.fr",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "filament/filament": "^4.0 || ^5.0",
+        "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/database": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0",
+        "spatie/laravel-package-tools": "^1.16"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.13",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^3.0 || ^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0 || ^4.0",
+        "phpstan/extension-installer": "^1.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "LaBoiteACode\\DependencyGraph\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LaBoiteACode\\DependencyGraph\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "LaBoiteACode\\DependencyGraph\\DependencyGraphServiceProvider"
+            ],
+            "aliases": {
+                "DependencyGraph": "LaBoiteACode\\DependencyGraph\\Facades\\DependencyGraph"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true
+        }
+    },
+    "scripts": {
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/pint",
+        "lint": "vendor/bin/pint --test",
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
