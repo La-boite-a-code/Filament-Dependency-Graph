@@ -7,21 +7,20 @@
             @endif
         </div>
 
-        <button
-            type="button"
-            class="fdg-icon-button"
+        <x-filament::icon-button
+            icon="heroicon-m-x-mark"
+            color="gray"
+            size="sm"
             wire:click="clearSelection"
-            aria-label="{{ __('filament-dependency-graph::graph.inspector.close') }}"
-            title="{{ __('filament-dependency-graph::graph.inspector.close') }}"
-        >
-            &times;
-        </button>
+            :label="__('filament-dependency-graph::graph.inspector.close')"
+            :tooltip="__('filament-dependency-graph::graph.inspector.close')"
+        />
     </div>
 
     @if ($inspection['subject_type'] !== 'edge')
-        <button type="button" class="fdg-button" wire:click="focusOnNode('{{ $inspection['subject_id'] }}')">
+        <x-filament::button color="gray" size="sm" wire:click="focusOnNode('{{ $inspection['subject_id'] }}')">
             {{ __('filament-dependency-graph::graph.inspector.focus_node') }}
-        </button>
+        </x-filament::button>
     @endif
 
     @foreach ($inspection['sections'] as $section)

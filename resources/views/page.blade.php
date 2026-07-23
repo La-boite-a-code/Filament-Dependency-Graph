@@ -21,87 +21,89 @@
         "
     >
         {{-- Toolbar --}}
-        <div class="fdg-toolbar">
-            <div class="fdg-toolbar-group">
-                <label class="fdg-label" for="fdg-scope">{{ __('filament-dependency-graph::graph.toolbar.scope') }}</label>
-                <select id="fdg-scope" class="fdg-select" wire:model.live="scope">
-                    <option value="filament">{{ __('filament-dependency-graph::graph.toolbar.scope_filament') }}</option>
-                    @if ($this->isLaravelScopeAllowed())
-                        <option value="laravel">{{ __('filament-dependency-graph::graph.toolbar.scope_laravel') }}</option>
-                    @endif
-                </select>
-            </div>
+        <x-filament::section compact>
+            <div class="fdg-toolbar">
+                <div class="fdg-toolbar-group">
+                    <label class="fdg-label" for="fdg-scope">{{ __('filament-dependency-graph::graph.toolbar.scope') }}</label>
+                    <x-filament::input.wrapper>
+                        <x-filament::input.select id="fdg-scope" wire:model.live="scope">
+                            <option value="filament">{{ __('filament-dependency-graph::graph.toolbar.scope_filament') }}</option>
+                            @if ($this->isLaravelScopeAllowed())
+                                <option value="laravel">{{ __('filament-dependency-graph::graph.toolbar.scope_laravel') }}</option>
+                            @endif
+                        </x-filament::input.select>
+                    </x-filament::input.wrapper>
+                </div>
 
-            <div class="fdg-toolbar-group fdg-view-switcher" role="tablist">
-                @foreach (['graph', 'tree', 'table'] as $mode)
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected="{{ $this->activeView === $mode ? 'true' : 'false' }}"
-                        class="fdg-view-button {{ $this->activeView === $mode ? 'fdg-active' : '' }}"
-                        wire:click="setView('{{ $mode }}')"
-                    >
-                        {{ __('filament-dependency-graph::graph.toolbar.view_' . $mode) }}
-                    </button>
-                @endforeach
-            </div>
+                <x-filament::tabs :label="__('filament-dependency-graph::graph.title')">
+                    @foreach (['graph', 'tree', 'table'] as $mode)
+                        <x-filament::tabs.item
+                            :active="$this->activeView === $mode"
+                            wire:click="setView('{{ $mode }}')"
+                        >
+                            {{ __('filament-dependency-graph::graph.toolbar.view_' . $mode) }}
+                        </x-filament::tabs.item>
+                    @endforeach
+                </x-filament::tabs>
 
-            <div class="fdg-toolbar-group fdg-search-wrapper">
-                <input
-                    id="fdg-search"
-                    type="search"
-                    class="fdg-input"
-                    placeholder="{{ __('filament-dependency-graph::graph.toolbar.search_placeholder') }}"
-                    autocomplete="off"
-                    wire:model.live.debounce.300ms="search"
-                />
+                <div class="fdg-toolbar-group fdg-search-wrapper">
+                    <x-filament::input.wrapper prefix-icon="heroicon-m-magnifying-glass" class="fdg-block">
+                        <x-filament::input
+                            id="fdg-search"
+                            type="search"
+                            placeholder="{{ __('filament-dependency-graph::graph.toolbar.search_placeholder') }}"
+                            autocomplete="off"
+                            wire:model.live.debounce.300ms="search"
+                        />
+                    </x-filament::input.wrapper>
 
-                @if (trim($this->search) !== '')
-                    <div class="fdg-search-results" role="listbox">
-                        @forelse ($searchGroups as $group)
-                            <div class="fdg-search-group">
-                                <div class="fdg-search-group-title">
-                                    {{ __('filament-dependency-graph::graph.node_types.' . $group['type']) }}
+                    @if (trim($this->search) !== '')
+                        <div class="fdg-search-results" role="listbox">
+                            @forelse ($searchGroups as $group)
+                                <div class="fdg-search-group">
+                                    <div class="fdg-search-group-title">
+                                        {{ __('filament-dependency-graph::graph.node_types.' . $group['type']) }}
+                                    </div>
+                                    @foreach ($group['results'] as $result)
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            class="fdg-search-result"
+                                            wire:click="selectSearchResult('{{ $result['node_id'] }}')"
+                                        >
+                                            <span class="fdg-search-result-label">{{ $result['label'] }}</span>
+                                            @if ($result['subtitle'])
+                                                <span class="fdg-search-result-subtitle">{{ $result['subtitle'] }}</span>
+                                            @endif
+                                        </button>
+                                    @endforeach
                                 </div>
-                                @foreach ($group['results'] as $result)
-                                    <button
-                                        type="button"
-                                        role="option"
-                                        class="fdg-search-result"
-                                        wire:click="selectSearchResult('{{ $result['node_id'] }}')"
-                                    >
-                                        <span class="fdg-search-result-label">{{ $result['label'] }}</span>
-                                        @if ($result['subtitle'])
-                                            <span class="fdg-search-result-subtitle">{{ $result['subtitle'] }}</span>
-                                        @endif
-                                    </button>
-                                @endforeach
-                            </div>
-                        @empty
-                            <div class="fdg-search-empty">{{ __('filament-dependency-graph::graph.search.no_results') }}</div>
-                        @endforelse
-                    </div>
-                @endif
-            </div>
+                            @empty
+                                <div class="fdg-search-empty">{{ __('filament-dependency-graph::graph.search.no_results') }}</div>
+                            @endforelse
+                        </div>
+                    @endif
+                </div>
 
-            <div class="fdg-toolbar-group">
-                <button type="button" class="fdg-button" wire:click="export('json')">
-                    {{ __('filament-dependency-graph::graph.toolbar.export_json') }}
-                </button>
-                <button type="button" class="fdg-button" wire:click="export('mermaid')">
-                    {{ __('filament-dependency-graph::graph.toolbar.export_mermaid') }}
-                </button>
-                <button type="button" class="fdg-button fdg-button-danger" wire:click="resetGraph">
-                    {{ __('filament-dependency-graph::graph.toolbar.reset') }}
-                </button>
+                <div class="fdg-toolbar-group">
+                    <x-filament::button color="gray" size="sm" wire:click="export('json')">
+                        {{ __('filament-dependency-graph::graph.toolbar.export_json') }}
+                    </x-filament::button>
+                    <x-filament::button color="gray" size="sm" wire:click="export('mermaid')">
+                        {{ __('filament-dependency-graph::graph.toolbar.export_mermaid') }}
+                    </x-filament::button>
+                    <x-filament::button color="danger" size="sm" outlined wire:click="resetGraph">
+                        {{ __('filament-dependency-graph::graph.toolbar.reset') }}
+                    </x-filament::button>
+                </div>
             </div>
-        </div>
+        </x-filament::section>
 
         {{-- Layout: explorer / workspace / inspector --}}
         <div class="fdg-layout {{ $inspection !== null ? 'fdg-has-inspector' : '' }}">
-            <aside class="fdg-explorer" aria-label="{{ __('filament-dependency-graph::graph.explorer.title') }}">
+            <x-filament::section compact class="fdg-explorer" aria-label="{{ __('filament-dependency-graph::graph.explorer.title') }}">
                 @include('filament-dependency-graph::partials.explorer')
-            </aside>
+            </x-filament::section>
 
             <main class="fdg-workspace">
                 @if ($payload['error'] !== null)
@@ -121,10 +123,12 @@
 
                     @if ($this->activeView === 'graph')
                         <label class="fdg-label" for="fdg-layout">{{ __('filament-dependency-graph::graph.workspace.layout') }}</label>
-                        <select id="fdg-layout" class="fdg-select" wire:model.live="graphLayout">
-                            <option value="hierarchical">{{ __('filament-dependency-graph::graph.workspace.layout_hierarchical') }}</option>
-                            <option value="force">{{ __('filament-dependency-graph::graph.workspace.layout_force') }}</option>
-                        </select>
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select id="fdg-layout" wire:model.live="graphLayout">
+                                <option value="hierarchical">{{ __('filament-dependency-graph::graph.workspace.layout_hierarchical') }}</option>
+                                <option value="force">{{ __('filament-dependency-graph::graph.workspace.layout_force') }}</option>
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
                     @endif
                 </div>
 
@@ -146,9 +150,9 @@
                             aria-label="{{ __('filament-dependency-graph::graph.title') }}"
                         >
                             <div class="fdg-graph-controls">
-                                <button type="button" class="fdg-button" x-on:click="fit()" aria-label="{{ __('filament-dependency-graph::graph.workspace.fit') }}">
+                                <x-filament::button color="gray" size="sm" x-on:click="fit()">
                                     {{ __('filament-dependency-graph::graph.workspace.fit') }}
-                                </button>
+                                </x-filament::button>
                             </div>
                             <div class="fdg-graph-container" x-ref="container"></div>
                         </div>
@@ -161,9 +165,9 @@
             </main>
 
             @if ($inspection !== null)
-                <aside class="fdg-inspector" aria-label="{{ __('filament-dependency-graph::graph.inspector.title') }}">
+                <x-filament::section compact class="fdg-inspector" aria-label="{{ __('filament-dependency-graph::graph.inspector.title') }}">
                     @include('filament-dependency-graph::partials.inspector', ['inspection' => $inspection])
-                </aside>
+                </x-filament::section>
             @endif
         </div>
     </div>

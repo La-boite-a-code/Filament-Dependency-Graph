@@ -9,8 +9,7 @@
 
             @foreach ($panelIds as $panelId)
                 <label class="fdg-checkbox">
-                    <input
-                        type="checkbox"
+                    <x-filament::input.checkbox
                         value="{{ $panelId }}"
                         wire:model.live="panelFilter"
                     />
@@ -25,9 +24,8 @@
 
         @foreach ($this->getNodeTypeOptions() as $value => $label)
             <label class="fdg-checkbox">
-                <input
-                    type="checkbox"
-                    @checked(! in_array($value, $this->hiddenNodeTypes, true))
+                <x-filament::input.checkbox
+                    :checked="! in_array($value, $this->hiddenNodeTypes, true)"
                     wire:click="toggleNodeType('{{ $value }}')"
                 />
                 <span>{{ $label }}</span>
@@ -40,9 +38,8 @@
 
         @foreach ($this->getRelationTypeOptions() as $value => $label)
             <label class="fdg-checkbox">
-                <input
-                    type="checkbox"
-                    @checked(! in_array($value, $this->hiddenRelationTypes, true))
+                <x-filament::input.checkbox
+                    :checked="! in_array($value, $this->hiddenRelationTypes, true)"
                     wire:click="toggleRelationType('{{ $value }}')"
                 />
                 <span>{{ $label }}</span>
@@ -54,37 +51,40 @@
         <h3 class="fdg-explorer-heading">{{ __('filament-dependency-graph::graph.explorer.filters') }}</h3>
 
         <label class="fdg-label" for="fdg-namespace">{{ __('filament-dependency-graph::graph.explorer.namespace') }}</label>
-        <input
-            id="fdg-namespace"
-            type="text"
-            class="fdg-input"
-            wire:model.live.debounce.400ms="namespaceFilter"
-        />
+        <x-filament::input.wrapper>
+            <x-filament::input
+                id="fdg-namespace"
+                type="text"
+                wire:model.live.debounce.400ms="namespaceFilter"
+            />
+        </x-filament::input.wrapper>
 
         <label class="fdg-label" for="fdg-ownership">{{ __('filament-dependency-graph::graph.explorer.ownership') }}</label>
-        <select id="fdg-ownership" class="fdg-select" wire:model.live="ownershipFilter">
-            <option value="all">{{ __('filament-dependency-graph::graph.explorer.ownership_all') }}</option>
-            <option value="application">{{ __('filament-dependency-graph::graph.explorer.ownership_application') }}</option>
-            <option value="vendor">{{ __('filament-dependency-graph::graph.explorer.ownership_vendor') }}</option>
-        </select>
+        <x-filament::input.wrapper>
+            <x-filament::input.select id="fdg-ownership" wire:model.live="ownershipFilter">
+                <option value="all">{{ __('filament-dependency-graph::graph.explorer.ownership_all') }}</option>
+                <option value="application">{{ __('filament-dependency-graph::graph.explorer.ownership_application') }}</option>
+                <option value="vendor">{{ __('filament-dependency-graph::graph.explorer.ownership_vendor') }}</option>
+            </x-filament::input.select>
+        </x-filament::input.wrapper>
 
         <label class="fdg-checkbox">
-            <input type="checkbox" wire:model.live="showOrphans" />
+            <x-filament::input.checkbox wire:model.live="showOrphans" />
             <span>{{ __('filament-dependency-graph::graph.explorer.show_orphans') }}</span>
         </label>
 
         <label class="fdg-checkbox">
-            <input type="checkbox" wire:model.live="onlyOrphans" />
+            <x-filament::input.checkbox wire:model.live="onlyOrphans" />
             <span>{{ __('filament-dependency-graph::graph.explorer.only_orphans') }}</span>
         </label>
 
         <label class="fdg-checkbox">
-            <input type="checkbox" wire:model.live="onlyCycles" />
+            <x-filament::input.checkbox wire:model.live="onlyCycles" />
             <span>{{ __('filament-dependency-graph::graph.explorer.only_cycles') }}</span>
         </label>
 
         <label class="fdg-checkbox">
-            <input type="checkbox" wire:model.live="onlyWithoutResource" />
+            <x-filament::input.checkbox wire:model.live="onlyWithoutResource" />
             <span>{{ __('filament-dependency-graph::graph.explorer.only_without_resource') }}</span>
         </label>
     </section>
@@ -96,23 +96,27 @@
             <p class="fdg-focus-node">{{ $this->focus }}</p>
 
             <label class="fdg-label" for="fdg-depth">{{ __('filament-dependency-graph::graph.explorer.focus_depth') }}</label>
-            <select id="fdg-depth" class="fdg-select" wire:model.live="depth">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="">{{ __('filament-dependency-graph::graph.explorer.focus_depth_unlimited') }}</option>
-            </select>
+            <x-filament::input.wrapper>
+                <x-filament::input.select id="fdg-depth" wire:model.live="depth">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="">{{ __('filament-dependency-graph::graph.explorer.focus_depth_unlimited') }}</option>
+                </x-filament::input.select>
+            </x-filament::input.wrapper>
 
             <label class="fdg-label" for="fdg-direction">{{ __('filament-dependency-graph::graph.explorer.focus_direction') }}</label>
-            <select id="fdg-direction" class="fdg-select" wire:model.live="direction">
-                <option value="incoming">{{ __('filament-dependency-graph::graph.explorer.direction_incoming') }}</option>
-                <option value="outgoing">{{ __('filament-dependency-graph::graph.explorer.direction_outgoing') }}</option>
-                <option value="both">{{ __('filament-dependency-graph::graph.explorer.direction_both') }}</option>
-            </select>
+            <x-filament::input.wrapper>
+                <x-filament::input.select id="fdg-direction" wire:model.live="direction">
+                    <option value="incoming">{{ __('filament-dependency-graph::graph.explorer.direction_incoming') }}</option>
+                    <option value="outgoing">{{ __('filament-dependency-graph::graph.explorer.direction_outgoing') }}</option>
+                    <option value="both">{{ __('filament-dependency-graph::graph.explorer.direction_both') }}</option>
+                </x-filament::input.select>
+            </x-filament::input.wrapper>
 
-            <button type="button" class="fdg-button" wire:click="clearFocus">
+            <x-filament::button color="gray" size="sm" wire:click="clearFocus">
                 {{ __('filament-dependency-graph::graph.explorer.exit_focus') }}
-            </button>
+            </x-filament::button>
         </section>
     @endif
 </div>

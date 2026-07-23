@@ -13,7 +13,9 @@
             {{ $item['label'] }}
         </button>
 
-        <span class="fdg-tree-type">{{ __('filament-dependency-graph::graph.node_types.' . $item['type']) }}</span>
+        <x-filament::badge color="gray" size="sm" class="fdg-tree-type">
+            {{ __('filament-dependency-graph::graph.node_types.' . $item['type']) }}
+        </x-filament::badge>
 
         @if ($item['already_shown'])
             <span class="fdg-muted">[{{ __('filament-dependency-graph::graph.tree.already_shown') }}]</span>

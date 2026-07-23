@@ -4,11 +4,17 @@
     $bool = fn (?bool $value): string => $value === null
         ? __('filament-dependency-graph::graph.table.unknown')
         : ($value ? __('filament-dependency-graph::graph.table.yes') : __('filament-dependency-graph::graph.table.no'));
+    $statusColor = fn (string $status): string => match ($status) {
+        'complete' => 'success',
+        'partial' => 'warning',
+        'failed' => 'danger',
+        default => 'gray',
+    };
 @endphp
 
 <div class="fdg-tables">
-    <section class="fdg-table-section">
-        <h3 class="fdg-table-title">{{ $t('models') }}</h3>
+    <x-filament::section compact class="fdg-table-section">
+        <x-slot name="heading">{{ $t('models') }}</x-slot>
 
         <div class="fdg-table-scroll">
             <table class="fdg-table">
@@ -34,16 +40,20 @@
                             <td>{{ $row['outgoing'] }}</td>
                             <td>{{ $row['incoming'] }}</td>
                             <td>{{ $bool($row['soft_deletes']) }}</td>
-                            <td>{{ $row['status'] }}</td>
+                            <td>
+                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
+                                    {{ $row['status'] }}
+                                </x-filament::badge>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-    </section>
+    </x-filament::section>
 
-    <section class="fdg-table-section">
-        <h3 class="fdg-table-title">{{ $t('relations') }}</h3>
+    <x-filament::section compact class="fdg-table-section">
+        <x-slot name="heading">{{ $t('relations') }}</x-slot>
 
         <div class="fdg-table-scroll">
             <table class="fdg-table">
@@ -69,16 +79,20 @@
                             <td>{{ $row['foreign_key'] ?? '-' }}</td>
                             <td>{{ $row['pivot'] ?? '-' }}</td>
                             <td>{{ $bool($row['nullable']) }}</td>
-                            <td>{{ $row['status'] }}</td>
+                            <td>
+                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
+                                    {{ $row['status'] }}
+                                </x-filament::badge>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-    </section>
+    </x-filament::section>
 
-    <section class="fdg-table-section">
-        <h3 class="fdg-table-title">{{ $t('resources') }}</h3>
+    <x-filament::section compact class="fdg-table-section">
+        <x-slot name="heading">{{ $t('resources') }}</x-slot>
 
         <div class="fdg-table-scroll">
             <table class="fdg-table">
@@ -102,11 +116,15 @@
                             <td>{{ $row['navigation_group'] ?? '-' }}</td>
                             <td>{{ $row['pages'] }}</td>
                             <td>{{ $row['relation_managers'] }}</td>
-                            <td>{{ $row['status'] }}</td>
+                            <td>
+                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
+                                    {{ $row['status'] }}
+                                </x-filament::badge>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-    </section>
+    </x-filament::section>
 </div>
