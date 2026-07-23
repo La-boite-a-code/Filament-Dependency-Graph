@@ -49,7 +49,7 @@ The CI matrix is the source of truth.
 
 | Package | PHP | Laravel | Filament |
 | ------- | --- | ------- | -------- |
-| 0.x     | 8.3, 8.4 | 12.x, 13.x | 4.x, 5.x |
+| 1.x     | 8.3, 8.4 | 12.x, 13.x | 4.x, 5.x |
 
 ## Installation
 
