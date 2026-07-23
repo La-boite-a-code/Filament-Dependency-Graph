@@ -4,6 +4,26 @@ All notable changes to `laboiteacode/filament-dependency-graph` are documented i
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Navigation and page customization, fluently on the plugin or via configuration: `navigationLabel()`, `navigationIcon()`, `activeNavigationIcon()`, `navigationGroup()`, `navigationSort()`, `navigationParentItem()`, `navigationBadge()`, `registerNavigation()`, `slug()`, `cluster()`, `maxContentWidth()` and `canAccessUsing()`.
+- The page renders full width by default (configurable through `page.max_content_width` or `maxContentWidth()`).
+
+### Changed
+
+- The graph palette now follows the panel theme color scales (`primary`, `success`, `info`, `warning`, `gray`) with the previous colors as fallback, and the whole page chrome (toolbar, explorer, inspector, tree and table cards, badges, tokens) is built from the native Filament section and badge components and the theme CSS variables.
+
+- Hierarchical graph layout now uses dagre (layered Sugiyama layout) and the force-directed layout uses fCoSE, replacing the built-in `breadthfirst` and `cose` layouts for much more readable graphs.
+- Relation labels on edges only appear at readable zoom levels, on a background chip.
+- Selecting a node or an edge fades everything outside its direct neighbourhood.
+- Explorer and toolbar controls (checkboxes, selects, text inputs, buttons, tabs) now use the native Filament Blade components instead of custom-styled inputs.
+
+### Fixed
+
+- The graph now sizes and fits reliably when the component mounts inside a container that is still hidden or unmeasured, and pointer hit-testing stays accurate after the inspector opens or closes.
+
 ## [0.1.0] - 2026-07-23
 
 ### Added

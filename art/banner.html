@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Filament Dependency Graph - banner</title>
+<style>
+  @font-face { font-family: "Satoshi"; src: local("Satoshi-Light");  font-weight: 300; font-style: normal; }
+  @font-face { font-family: "Satoshi"; src: local("Satoshi-Regular"); font-weight: 400; font-style: normal; }
+  @font-face { font-family: "Satoshi"; src: local("Satoshi-Medium"); font-weight: 500; font-style: normal; }
+  @font-face { font-family: "Satoshi"; src: local("Satoshi-Bold");   font-weight: 700; font-style: normal; }
+  @font-face { font-family: "Satoshi"; src: local("Satoshi-Black");  font-weight: 900; font-style: normal; }
+
+  :root{
+    --paper:#FAF8F4;
+    --ink:#17150F;
+    --ink-2:#514B41;
+    --muted:#8A8172;
+    --line:#E6E0D4;
+    --indigo:#6366F1;
+    --indigo-deep:#4338CA;
+    --mark:#C7D2FE;
+
+    /* Filament / product UI tokens (light) */
+    --ui-line:#E5E7EB;
+    --ui-line-2:#F3F4F6;
+    --ui-text:#111827;
+    --ui-muted:#6B7280;
+    --ui-muted-2:#9CA3AF;
+
+    /* node type colors, same as the product */
+    --panel-fill:#E0E7FF;   --panel-border:#6366F1;   --panel-text:#312E81;
+    --res-fill:#CCFBF1;     --res-border:#0D9488;     --res-text:#134E4A;
+    --model-fill:#F9FAFB;   --model-border:#9CA3AF;
+    --poly-fill:#FAE8FF;    --poly-border:#C026D3;    --poly-text:#86198F;
+    --selection:#D97706;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ width:1280px; height:720px; overflow:hidden; }
+  body{
+    position:relative;
+    background:var(--paper);
+    font-family:"Satoshi", -apple-system, BlinkMacSystemFont, sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
+  }
+
+  /* ---------- atmosphere ---------- */
+  .grid{
+    position:absolute; inset:0;
+    background-image:radial-gradient(circle at 1px 1px, rgba(23,21,15,.13) 1px, transparent 0);
+    background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(115deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.16) 46%, transparent 72%);
+            mask-image:linear-gradient(115deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.16) 46%, transparent 72%);
+  }
+  .glow-a{
+    position:absolute; width:900px; height:900px; right:-230px; top:-380px;
+    background:radial-gradient(circle, rgba(99,102,241,.20) 0%, rgba(99,102,241,.07) 42%, transparent 66%);
+  }
+  .glow-b{
+    position:absolute; width:760px; height:760px; left:-300px; bottom:-380px;
+    background:radial-gradient(circle, rgba(192,38,211,.07) 0%, transparent 64%);
+  }
+  .wash{
+    position:absolute; inset:0;
+    background:linear-gradient(100deg, transparent 46%, rgba(219,214,228,.30) 100%);
+  }
+
+  .stage{ position:relative; width:1280px; height:720px; }
+
+  /* ---------- left column ---------- */
+  .copy{
+    position:absolute; left:74px; top:0; bottom:0; width:502px;
+    display:flex; flex-direction:column; justify-content:center;
+    z-index:3;
+  }
+  .eyebrow{
+    display:flex; align-items:center; gap:10px;
+    font-size:12.5px; font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--indigo-deep);
+    margin-bottom:22px;
+  }
+  .eyebrow .dot{
+    width:7px; height:7px; border-radius:50%; background:var(--indigo);
+    box-shadow:0 0 0 4px rgba(99,102,241,.16);
+  }
+  .eyebrow .sep{ color:#CFC8E2; font-weight:500; letter-spacing:0; }
+
+  h1{
+    font-weight:900; font-size:82px; line-height:.92; letter-spacing:-.04em;
+    color:var(--ink);
+  }
+  h1 .l2{ display:block; }
+
+  .sub{
+    margin-top:24px;
+    font-size:20.5px; line-height:1.5; font-weight:500; color:var(--ink-2);
+    max-width:478px; letter-spacing:-.006em;
+  }
+  .sub mark{
+    background:var(--mark); color:#1E1B4B; border-radius:3px;
+    padding:.06em .22em; margin-inline:-.06em;
+    box-decoration-break:clone; -webkit-box-decoration-break:clone;
+  }
+
+  .pills{ display:flex; gap:9px; margin-top:32px; flex-wrap:wrap; }
+  .pill{
+    display:inline-flex; align-items:center; gap:7px;
+    padding:8px 13px 8px 11px;
+    background:rgba(255,255,255,.85);
+    border:1px solid var(--line);
+    border-radius:999px;
+    font-size:13px; font-weight:600; color:var(--ink-2); letter-spacing:-.005em;
+    box-shadow:0 1px 2px rgba(23,21,15,.03);
+  }
+  .pill svg{ width:14px; height:14px; stroke:var(--indigo-deep); fill:none; stroke-width:2; }
+
+  .cmd{
+    margin-top:34px;
+    display:inline-flex; align-items:center; gap:11px;
+    align-self:flex-start;
+    padding:12px 16px;
+    background:#FFFFFF;
+    border:1px solid var(--line);
+    border-radius:11px;
+    box-shadow:0 1px 2px rgba(23,21,15,.04), 0 8px 18px -12px rgba(23,21,15,.18);
+    font-family:ui-monospace,"SF Mono",Menlo,monospace;
+    font-size:13px; color:#332E24; letter-spacing:-.01em;
+  }
+  .cmd .prompt{ color:var(--indigo); font-weight:700; }
+  .cmd .dim{ color:var(--muted); }
+
+  /* ---------- right: UI mock ---------- */
+  .mock{ position:absolute; inset:0; z-index:2; }
+
+  .card{
+    position:absolute;
+    background:#fff;
+    border:1px solid var(--ui-line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+
+  /* back card - explorer filters */
+  .exp-card{
+    left:712px; top:38px; width:492px; height:308px;
+    box-shadow:0 1px 2px rgba(23,21,15,.04), 0 16px 34px -20px rgba(23,21,15,.20);
+  }
+  .exp-head{ padding:16px 20px 12px; border-bottom:1px solid var(--ui-line-2); }
+  .exp-title{ font-size:14.5px; font-weight:700; color:var(--ui-text); letter-spacing:-.012em; }
+  .exp-sub{ margin-top:4px; font-size:11.5px; color:var(--ui-muted); }
+  .exp-cols{ display:grid; grid-template-columns:1fr 1fr; gap:0 18px; padding:12px 20px; }
+  .exp-sec{ font-size:10px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ui-muted-2); margin:6px 0 7px; }
+  .chk{ display:flex; align-items:center; gap:9px; padding:4.5px 0; }
+  .chk .box{
+    width:15px; height:15px; border-radius:4px; background:var(--indigo);
+    box-shadow:0 1px 2px rgba(67,56,202,.30);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .chk .box svg{ width:9px; height:9px; stroke:#fff; fill:none; stroke-width:3.2; }
+  .chk .box.off{ background:#fff; border:1px solid #D1D5DB; box-shadow:none; }
+  .chk span{ font-size:12.5px; font-weight:500; color:#374151; letter-spacing:-.006em; }
+
+  /* front card - graph workspace */
+  .graph-card{
+    left:606px; top:212px; width:648px; height:610px;
+    border-radius:16px;
+    box-shadow:
+      0 2px 4px rgba(23,21,15,.05),
+      0 30px 56px -22px rgba(23,21,15,.26),
+      -26px 44px 92px -46px rgba(23,21,15,.38);
+  }
+  .g-head{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    padding:17px 20px 13px;
+  }
+  .g-title{ font-size:15.5px; font-weight:700; color:var(--ui-text); letter-spacing:-.014em; }
+  .g-meta{ margin-top:4px; font-size:11.5px; color:var(--ui-muted); }
+  .g-meta i{ font-style:normal; color:#D1D5DB; margin:0 6px; }
+  .g-actions{ display:flex; align-items:center; gap:8px; }
+  .btn-ghost{
+    display:inline-flex; align-items:center; gap:6px;
+    height:30px; padding:0 11px; border-radius:8px; border:1px solid var(--ui-line);
+    background:#fff; font-size:12px; font-weight:600; color:#374151;
+  }
+  .btn-ghost svg{ width:14px; height:14px; stroke:#6B7280; fill:none; stroke-width:1.8; }
+  .btn-primary{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:8px;
+    background:var(--indigo); color:#fff;
+    font-size:12.5px; font-weight:700; letter-spacing:-.008em;
+    box-shadow:0 1px 2px rgba(67,56,202,.35);
+  }
+  .btn-primary svg{ width:13px; height:13px; stroke:#fff; fill:none; stroke-width:2.2; }
+
+  .canvas{
+    position:relative;
+    margin:0 20px;
+    height:506px;
+    border:1px solid var(--ui-line);
+    border-radius:12px;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(17,24,39,.07) 1px, transparent 0) 0 0 / 18px 18px,
+      #FCFCFD;
+    overflow:hidden;
+  }
+  .canvas svg{ position:absolute; inset:0; }
+
+  .n-label{ font-family:"Satoshi",sans-serif; font-size:12.5px; font-weight:700; fill:var(--ui-text); letter-spacing:-.14px; }
+  .n-sub{ font-family:"Satoshi",sans-serif; font-size:9px; font-weight:500; fill:var(--ui-muted); }
+  .e-label{ font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:9px; fill:#6B7280; }
+
+  /* floating inspector */
+  .inspector{
+    position:absolute; left:986px; top:292px; width:234px; z-index:4;
+    background:#fff; border:1px solid var(--ui-line); border-radius:12px;
+    box-shadow:0 2px 4px rgba(23,21,15,.06), 0 22px 44px -18px rgba(23,21,15,.30);
+    padding:14px 15px;
+  }
+  .in-title{ font-size:14px; font-weight:700; color:var(--ui-text); letter-spacing:-.012em; }
+  .in-ns{ margin-top:2px; font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:9.5px; color:var(--ui-muted); }
+  .in-sec{ margin-top:11px; font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ui-muted-2); }
+  .in-row{
+    display:flex; align-items:center; gap:6px; margin-top:7px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:10.5px; color:#374151;
+  }
+  .in-row .arrow{ color:#C4C9D4; }
+  .in-row .to{ font-family:"Satoshi",sans-serif; font-size:11px; font-weight:700; color:var(--ui-text); letter-spacing:-.01em; }
+  .in-badge{
+    margin-left:auto;
+    padding:1.5px 7px; border-radius:999px;
+    background:#EEF2FF; border:1px solid #C7D2FE;
+    font-family:"Satoshi",sans-serif; font-size:9.5px; font-weight:700; color:#4338CA;
+  }
+  .in-foot{ display:flex; align-items:center; gap:8px; margin-top:13px; }
+  .in-focus{
+    flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px;
+    padding:6.5px 0; border-radius:8px; background:var(--indigo);
+    font-size:11.5px; font-weight:700; color:#fff;
+    box-shadow:0 1px 2px rgba(67,56,202,.35);
+  }
+  .in-focus svg{ width:12px; height:12px; stroke:#fff; fill:none; stroke-width:2.2; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="wash"></div>
+  <div class="grid"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+
+  <!-- ============ UI MOCK ============ -->
+  <div class="mock">
+
+    <!-- explorer filters -->
+    <div class="card exp-card">
+      <div class="exp-head">
+        <div class="exp-title">Explorer</div>
+        <div class="exp-sub">Filter panels, node types and relations</div>
+      </div>
+      <div class="exp-cols">
+        <div>
+          <div class="exp-sec">Node types</div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>Panels</span></div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>Resources</span></div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>Models</span></div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>Polymorphic targets</span></div>
+        </div>
+        <div>
+          <div class="exp-sec">Relation types</div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>belongsTo</span></div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>hasMany</span></div>
+          <div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg></span><span>belongsToMany</span></div>
+          <div class="chk"><span class="box off"></span><span>morphToMany</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- graph workspace -->
+    <div class="card graph-card">
+      <div class="g-head">
+        <div>
+          <div class="g-title">Dependency graph</div>
+          <div class="g-meta">43 nodes<i>&#183;</i>93 edges<i>&#183;</i>Hierarchical</div>
+        </div>
+        <div class="g-actions">
+          <span class="btn-ghost">
+            <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg>
+            Fit
+          </span>
+          <span class="btn-primary">
+            <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+            Export
+          </span>
+        </div>
+      </div>
+
+      <div class="canvas">
+        <svg viewBox="0 0 606 504" width="606" height="504">
+          <defs>
+            <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0.6 L7.4,4 L0,7.4 z" fill="#9CA3AF"/>
+            </marker>
+            <marker id="arr-soft" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0.6 L7.4,4 L0,7.4 z" fill="#D1D5DB"/>
+            </marker>
+          </defs>
+
+          <!-- structural edges (dashed) -->
+          <path d="M252,54 C230,72 206,84 188,97" fill="none" stroke="#D1D5DB" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arr-soft)"/>
+          <path d="M313,40 C372,48 428,58 470,68" fill="none" stroke="#D1D5DB" stroke-width="1.4" stroke-dasharray="4 4" stroke-opacity=".6"/>
+          <path d="M168,141 L168,204" fill="none" stroke="#D1D5DB" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#arr-soft)"/>
+
+          <!-- relation edges -->
+          <path d="M216,233 L330,233" fill="none" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+          <path d="M146,254 C122,282 100,304 84,322" fill="none" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+          <path d="M186,254 C206,282 226,304 244,322" fill="none" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+          <path d="M412,254 C438,282 466,304 488,322" fill="none" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+          <path d="M250,366 L250,386" fill="none" stroke="#9CA3AF" stroke-width="1.5" marker-end="url(#arr)"/>
+
+          <!-- edge labels -->
+          <g>
+            <rect x="243" y="224.5" width="60" height="17" rx="4.5" fill="#fff" stroke="#E5E7EB"/>
+            <text x="273" y="236" text-anchor="middle" class="e-label">customer</text>
+          </g>
+          <g>
+            <rect x="87" y="280.5" width="42" height="17" rx="4.5" fill="#fff" stroke="#E5E7EB"/>
+            <text x="108" y="292" text-anchor="middle" class="e-label">items</text>
+          </g>
+          <g>
+            <rect x="193" y="280.5" width="62" height="17" rx="4.5" fill="#fff" stroke="#E5E7EB"/>
+            <text x="224" y="292" text-anchor="middle" class="e-label">payments</text>
+          </g>
+          <g>
+            <rect x="422" y="280.5" width="66" height="17" rx="4.5" fill="#fff" stroke="#E5E7EB"/>
+            <text x="455" y="292" text-anchor="middle" class="e-label">addresses</text>
+          </g>
+          <g>
+            <rect x="260" y="367.5" width="52" height="17" rx="4.5" fill="#fff" stroke="#E5E7EB"/>
+            <text x="286" y="379" text-anchor="middle" class="e-label">payable</text>
+          </g>
+
+          <!-- panel: admin -->
+          <rect x="227" y="22" width="86" height="32" rx="8" fill="#E0E7FF" stroke="#6366F1" stroke-width="1.5"/>
+          <text x="270" y="42" text-anchor="middle" class="n-label" style="fill:#312E81">admin</text>
+
+          <!-- resource: OrderResource -->
+          <polygon points="92,120 106,99 230,99 244,120 230,141 106,141" fill="#CCFBF1" stroke="#0D9488" stroke-width="1.5"/>
+          <text x="168" y="117" text-anchor="middle" class="n-label" style="fill:#134E4A">OrderResource</text>
+          <text x="168" y="131" text-anchor="middle" class="n-sub" style="fill:#0F766E">Order</text>
+
+          <!-- model: Order (selected) -->
+          <rect x="116" y="208" width="103" height="50" rx="12" fill="none" stroke="#F59E0B" stroke-opacity=".28" stroke-width="7"/>
+          <rect x="120" y="212" width="95" height="42" rx="9" fill="#FFFFFF" stroke="#D97706" stroke-width="2.4"/>
+          <text x="167.5" y="230" text-anchor="middle" class="n-label">Order</text>
+          <text x="167.5" y="244" text-anchor="middle" class="n-sub">orders</text>
+
+          <!-- model: Customer -->
+          <rect x="336" y="212" width="108" height="42" rx="9" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.3"/>
+          <text x="390" y="230" text-anchor="middle" class="n-label">Customer</text>
+          <text x="390" y="244" text-anchor="middle" class="n-sub">customers</text>
+
+          <!-- model: OrderItem -->
+          <rect x="26" y="324" width="104" height="42" rx="9" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.3"/>
+          <text x="78" y="342" text-anchor="middle" class="n-label">OrderItem</text>
+          <text x="78" y="356" text-anchor="middle" class="n-sub">order_items</text>
+
+          <!-- model: Payment -->
+          <rect x="200" y="324" width="100" height="42" rx="9" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.3"/>
+          <text x="250" y="342" text-anchor="middle" class="n-label">Payment</text>
+          <text x="250" y="356" text-anchor="middle" class="n-sub">payments</text>
+
+          <!-- model: Address -->
+          <rect x="450" y="324" width="100" height="42" rx="9" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.3"/>
+          <text x="500" y="342" text-anchor="middle" class="n-label">Address</text>
+          <text x="500" y="356" text-anchor="middle" class="n-sub">addresses</text>
+
+          <!-- polymorphic target: Payable -->
+          <polygon points="250,390 328,415 250,440 172,415" fill="#FAE8FF" stroke="#C026D3" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="250" y="413" text-anchor="middle" class="n-label" style="fill:#86198F; font-size:11.5px">Payable</text>
+          <text x="250" y="426" text-anchor="middle" class="n-sub" style="fill:#A21CAF; font-size:8.5px">Polymorphic target</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- floating inspector -->
+    <div class="inspector">
+      <div class="in-title">Order</div>
+      <div class="in-ns">App\Models\Order</div>
+
+      <div class="in-sec">Relations</div>
+      <div class="in-row"><span>customer</span><span class="arrow">&#8594;</span><span class="to">Customer</span><span class="in-badge">belongsTo</span></div>
+      <div class="in-row"><span>items</span><span class="arrow">&#8594;</span><span class="to">OrderItem</span><span class="in-badge">hasMany</span></div>
+      <div class="in-row"><span>payments</span><span class="arrow">&#8594;</span><span class="to">Payment</span><span class="in-badge">morphMany</span></div>
+
+      <div class="in-foot">
+        <span class="in-focus">
+          <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+          Focus node
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ COPY ============ -->
+  <div class="copy">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span>Filament plugin</span>
+      <span class="sep">/</span>
+      <span>v4 &amp; v5</span>
+    </div>
+
+    <h1>Dependency<span class="l2">Graph</span></h1>
+
+    <p class="sub">
+      Your models, resources, panels and every Eloquent relationship,
+      explored from <mark>one visual workspace</mark>.
+    </p>
+
+    <div class="pills">
+      <span class="pill">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z"/></svg>
+        Graph, tree &amp; table views
+      </span>
+      <span class="pill">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+        Cycle &amp; orphan detection
+      </span>
+      <span class="pill">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+        JSON &amp; Mermaid exports
+      </span>
+    </div>
+
+    <div class="cmd">
+      <span class="prompt">$</span>
+      <span><span class="dim">composer require</span> laboiteacode/filament-dependency-graph</span>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Filament Dependency Graph - thumbnail</title>
+<style>
+  @font-face { font-family:"Satoshi"; src:local("Satoshi-Regular"); font-weight:400; }
+  @font-face { font-family:"Satoshi"; src:local("Satoshi-Medium");  font-weight:500; }
+  @font-face { font-family:"Satoshi"; src:local("Satoshi-Bold");    font-weight:700; }
+  @font-face { font-family:"Satoshi"; src:local("Satoshi-Black");   font-weight:900; }
+
+  :root{
+    --paper:#FAF8F4;
+    --ink:#17150F;
+    --ink-2:#514B41;
+    --line:#E6E0D4;
+    --indigo:#6366F1;
+    --indigo-deep:#4338CA;
+    --mark:#C7D2FE;
+
+    --ui-line:#E5E7EB;
+    --ui-line-2:#F3F4F6;
+    --ui-text:#111827;
+    --ui-muted:#6B7280;
+    --ui-muted-2:#9CA3AF;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ width:1280px; height:720px; overflow:hidden; }
+  body{
+    background:var(--paper);
+    font-family:"Satoshi", -apple-system, BlinkMacSystemFont, sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:geometricPrecision;
+  }
+
+  .stage{ position:relative; width:1280px; height:720px; }
+
+  .grid{
+    position:absolute; inset:0;
+    background-image:radial-gradient(circle at 1px 1px, rgba(23,21,15,.13) 1px, transparent 0);
+    background-size:22px 22px;
+    -webkit-mask-image:linear-gradient(115deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.16) 46%, transparent 72%);
+            mask-image:linear-gradient(115deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.16) 46%, transparent 72%);
+  }
+  .glow-a{
+    position:absolute; width:900px; height:900px; right:-230px; top:-380px;
+    background:radial-gradient(circle, rgba(99,102,241,.22) 0%, rgba(99,102,241,.08) 42%, transparent 66%);
+  }
+  .glow-b{
+    position:absolute; width:760px; height:760px; left:-300px; bottom:-380px;
+    background:radial-gradient(circle, rgba(192,38,211,.08) 0%, transparent 64%);
+  }
+  .wash{
+    position:absolute; inset:0;
+    background:linear-gradient(100deg, transparent 46%, rgba(219,214,228,.30) 100%);
+  }
+
+  /* ---------- copy ---------- */
+  .copy{
+    position:absolute; left:76px; top:0; bottom:0; width:520px;
+    display:flex; flex-direction:column; justify-content:center;
+    z-index:3;
+  }
+  .eyebrow{
+    display:flex; align-items:center; gap:11px;
+    font-size:14px; font-weight:700; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--indigo-deep); margin-bottom:24px;
+  }
+  .eyebrow .dot{
+    width:8px; height:8px; border-radius:50%; background:var(--indigo);
+    box-shadow:0 0 0 5px rgba(99,102,241,.16);
+  }
+  h1{ font-weight:900; font-size:92px; line-height:.9; letter-spacing:-.042em; }
+  h1 span{ display:block; }
+  .sub{
+    margin-top:28px; font-size:24px; line-height:1.42; font-weight:500;
+    color:var(--ink-2); max-width:480px; letter-spacing:-.008em;
+  }
+  .sub mark{
+    background:var(--mark); color:#1E1B4B; border-radius:3px;
+    padding:.06em .2em; margin-inline:-.05em;
+  }
+
+  /* ---------- zoomed graph fragment ---------- */
+  .frag{
+    position:absolute; left:636px; top:110px; width:740px; height:640px;
+    background:#fff; border:1px solid var(--ui-line); border-radius:18px;
+    overflow:hidden; z-index:2;
+    box-shadow:
+      0 2px 4px rgba(23,21,15,.05),
+      0 30px 56px -22px rgba(23,21,15,.26),
+      -26px 44px 92px -46px rgba(23,21,15,.38);
+  }
+  .g-head{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    padding:22px 26px 16px;
+    max-width:614px;
+  }
+  .g-title{ font-size:19px; font-weight:700; color:var(--ui-text); letter-spacing:-.014em; }
+  .g-meta{ margin-top:5px; font-size:13.5px; color:var(--ui-muted); }
+  .g-meta i{ font-style:normal; color:#D1D5DB; margin:0 7px; }
+  .btn-primary{
+    display:inline-flex; align-items:center; gap:7px;
+    padding:9px 17px; border-radius:9px;
+    background:var(--indigo); color:#fff;
+    font-size:14.5px; font-weight:700; letter-spacing:-.008em;
+    box-shadow:0 1px 2px rgba(67,56,202,.35);
+  }
+  .btn-primary svg{ width:15px; height:15px; stroke:#fff; fill:none; stroke-width:2.2; }
+
+  .canvas{
+    position:relative;
+    margin:0 26px;
+    height:548px;
+    border:1px solid var(--ui-line);
+    border-radius:14px;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(17,24,39,.07) 1px, transparent 0) 0 0 / 20px 20px,
+      #FCFCFD;
+    overflow:hidden;
+  }
+  .canvas svg{ position:absolute; inset:0; }
+
+  .n-label{ font-family:"Satoshi",sans-serif; font-size:15px; font-weight:700; fill:var(--ui-text); letter-spacing:-.18px; }
+  .n-sub{ font-family:"Satoshi",sans-serif; font-size:11px; font-weight:500; fill:var(--ui-muted); }
+  .e-label{ font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:11px; fill:#6B7280; }
+
+  /* floating inspector */
+  .inspector{
+    position:absolute; left:1018px; top:208px; width:250px; z-index:4;
+    background:#fff; border:1px solid var(--ui-line); border-radius:14px;
+    box-shadow:0 2px 4px rgba(23,21,15,.06), 0 22px 44px -18px rgba(23,21,15,.30);
+    padding:16px 17px;
+  }
+  .in-title{ font-size:15.5px; font-weight:700; color:var(--ui-text); letter-spacing:-.012em; }
+  .in-ns{ margin-top:2px; font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:10.5px; color:var(--ui-muted); }
+  .in-sec{ margin-top:12px; font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ui-muted-2); }
+  .in-row{
+    display:flex; align-items:center; gap:7px; margin-top:8px;
+    font-family:ui-monospace,"SF Mono",Menlo,monospace; font-size:11.5px; color:#374151;
+  }
+  .in-row .arrow{ color:#C4C9D4; }
+  .in-row .to{ font-family:"Satoshi",sans-serif; font-size:12px; font-weight:700; color:var(--ui-text); letter-spacing:-.01em; }
+  .in-badge{
+    margin-left:auto;
+    padding:2px 8px; border-radius:999px;
+    background:#EEF2FF; border:1px solid #C7D2FE;
+    font-family:"Satoshi",sans-serif; font-size:10px; font-weight:700; color:#4338CA;
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="wash"></div>
+  <div class="grid"></div>
+  <div class="glow-a"></div>
+  <div class="glow-b"></div>
+
+  <!-- zoomed graph fragment -->
+  <div class="frag">
+    <div class="g-head">
+      <div>
+        <div class="g-title">Dependency graph</div>
+        <div class="g-meta">43 nodes<i>&#183;</i>93 edges<i>&#183;</i>Hierarchical</div>
+      </div>
+      <span class="btn-primary">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+        Export
+      </span>
+    </div>
+
+    <div class="canvas">
+      <svg viewBox="0 0 686 548" width="686" height="548">
+        <defs>
+          <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+            <path d="M0,0.6 L7.4,4 L0,7.4 z" fill="#9CA3AF"/>
+          </marker>
+          <marker id="arr-soft" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+            <path d="M0,0.6 L7.4,4 L0,7.4 z" fill="#D1D5DB"/>
+          </marker>
+        </defs>
+
+        <!-- structural edges (dashed) -->
+        <path d="M285,66 C264,88 246,106 232,120" fill="none" stroke="#D1D5DB" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arr-soft)"/>
+        <path d="M353,44 C420,54 470,64 510,76" fill="none" stroke="#D1D5DB" stroke-width="1.6" stroke-dasharray="5 5" stroke-opacity=".6"/>
+        <path d="M205,178 L205,255" fill="none" stroke="#D1D5DB" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arr-soft)"/>
+
+        <!-- relation edges -->
+        <path d="M265,290 L420,290" fill="none" stroke="#9CA3AF" stroke-width="1.7" marker-end="url(#arr)"/>
+        <path d="M180,316 C154,346 132,372 116,395" fill="none" stroke="#9CA3AF" stroke-width="1.7" marker-end="url(#arr)"/>
+        <path d="M232,316 C262,346 292,372 318,395" fill="none" stroke="#9CA3AF" stroke-width="1.7" marker-end="url(#arr)"/>
+        <path d="M508,316 C524,346 538,372 548,395" fill="none" stroke="#9CA3AF" stroke-width="1.7" marker-end="url(#arr)"/>
+        <path d="M336,451 L336,466" fill="none" stroke="#9CA3AF" stroke-width="1.7" marker-end="url(#arr)"/>
+
+        <!-- edge labels -->
+        <g>
+          <rect x="304" y="279.5" width="76" height="21" rx="5.5" fill="#fff" stroke="#E5E7EB"/>
+          <text x="342" y="294" text-anchor="middle" class="e-label">customer</text>
+        </g>
+        <g>
+          <rect x="118" y="341.5" width="52" height="21" rx="5.5" fill="#fff" stroke="#E5E7EB"/>
+          <text x="144" y="356" text-anchor="middle" class="e-label">items</text>
+        </g>
+        <g>
+          <rect x="242" y="341.5" width="80" height="21" rx="5.5" fill="#fff" stroke="#E5E7EB"/>
+          <text x="282" y="356" text-anchor="middle" class="e-label">payments</text>
+        </g>
+        <g>
+          <rect x="490" y="341.5" width="84" height="21" rx="5.5" fill="#fff" stroke="#E5E7EB"/>
+          <text x="532" y="356" text-anchor="middle" class="e-label">addresses</text>
+        </g>
+
+        <!-- panel: admin -->
+        <rect x="247" y="28" width="106" height="38" rx="9" fill="#E0E7FF" stroke="#6366F1" stroke-width="1.7"/>
+        <text x="300" y="52" text-anchor="middle" class="n-label" style="fill:#312E81">admin</text>
+
+        <!-- resource: OrderResource -->
+        <polygon points="110,151 128,124 282,124 300,151 282,178 128,178" fill="#CCFBF1" stroke="#0D9488" stroke-width="1.7"/>
+        <text x="205" y="148" text-anchor="middle" class="n-label" style="fill:#134E4A">OrderResource</text>
+        <text x="205" y="165" text-anchor="middle" class="n-sub" style="fill:#0F766E">Order</text>
+
+        <!-- model: Order (selected) -->
+        <rect x="142" y="259" width="126" height="62" rx="14" fill="none" stroke="#F59E0B" stroke-opacity=".28" stroke-width="8"/>
+        <rect x="147" y="264" width="116" height="52" rx="11" fill="#FFFFFF" stroke="#D97706" stroke-width="2.8"/>
+        <text x="205" y="287" text-anchor="middle" class="n-label">Order</text>
+        <text x="205" y="304" text-anchor="middle" class="n-sub">orders</text>
+
+        <!-- model: Customer -->
+        <rect x="424" y="264" width="132" height="52" rx="11" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5"/>
+        <text x="490" y="287" text-anchor="middle" class="n-label">Customer</text>
+        <text x="490" y="304" text-anchor="middle" class="n-sub">customers</text>
+
+        <!-- model: OrderItem -->
+        <rect x="45" y="399" width="126" height="52" rx="11" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5"/>
+        <text x="108" y="422" text-anchor="middle" class="n-label">OrderItem</text>
+        <text x="108" y="439" text-anchor="middle" class="n-sub">order_items</text>
+
+        <!-- model: Payment -->
+        <rect x="276" y="399" width="120" height="52" rx="11" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5"/>
+        <text x="336" y="422" text-anchor="middle" class="n-label">Payment</text>
+        <text x="336" y="439" text-anchor="middle" class="n-sub">payments</text>
+
+        <!-- model: Address -->
+        <rect x="482" y="399" width="120" height="52" rx="11" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5"/>
+        <text x="542" y="422" text-anchor="middle" class="n-label">Address</text>
+        <text x="542" y="439" text-anchor="middle" class="n-sub">addresses</text>
+
+        <!-- polymorphic target: Payable -->
+        <polygon points="336,472 438,500 336,528 234,500" fill="#FAE8FF" stroke="#C026D3" stroke-width="1.7" stroke-dasharray="6 5"/>
+        <text x="336" y="497" text-anchor="middle" class="n-label" style="fill:#86198F; font-size:13.5px">Payable</text>
+        <text x="336" y="513" text-anchor="middle" class="n-sub" style="fill:#A21CAF; font-size:10px">Polymorphic target</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- floating inspector -->
+  <div class="inspector">
+    <div class="in-title">Order</div>
+    <div class="in-ns">App\Models\Order</div>
+
+    <div class="in-sec">Relations</div>
+    <div class="in-row"><span>customer</span><span class="arrow">&#8594;</span><span class="to">Customer</span><span class="in-badge">belongsTo</span></div>
+    <div class="in-row"><span>items</span><span class="arrow">&#8594;</span><span class="to">OrderItem</span><span class="in-badge">hasMany</span></div>
+    <div class="in-row"><span>payments</span><span class="arrow">&#8594;</span><span class="to">Payment</span><span class="in-badge">morphMany</span></div>
+  </div>
+
+  <!-- ============ COPY ============ -->
+  <div class="copy">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span>Filament plugin</span>
+    </div>
+
+    <h1>Dependency<span>Graph</span></h1>
+
+    <p class="sub">
+      Models, resources, panels and every relationship
+      on <mark>one visual map</mark>.
+    </p>
+  </div>
+</div>
+</body>
+</html>
