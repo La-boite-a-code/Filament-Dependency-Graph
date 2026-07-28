@@ -2,37 +2,74 @@
    panel colors flow into the page; the fallbacks mirror the default theme. */
 .fdg-page {
     --fdg-border: var(--gray-200, #e5e7eb);
+    --fdg-border-strong: var(--gray-300, #d1d5db);
     --fdg-bg: var(--color-white, #ffffff);
     --fdg-bg-muted: var(--gray-50, #f9f9fb);
     --fdg-text: var(--gray-950, #111827);
     --fdg-text-muted: var(--gray-500, #6b7280);
     --fdg-accent: var(--primary-600, #6366f1);
     --fdg-danger: var(--danger-600, #dc2626);
+    --fdg-grid-dot: rgb(148 163 184 / 0.28);
+    --fdg-page-dot: color-mix(in srgb, var(--gray-400, #9ca3af) 24%, transparent);
+    --fdg-page-bg: color-mix(in srgb, var(--gray-50, #f9fafb) 88%, var(--primary-50, #eef2ff));
+    --fdg-surface: color-mix(in srgb, var(--color-white, #ffffff) 96%, var(--primary-50, #eef2ff));
+    --fdg-shadow:
+        0 1px 2px rgb(15 23 42 / 0.04),
+        0 20px 50px color-mix(in srgb, var(--primary-950, #312e81) 8%, transparent);
 
     color: var(--fdg-text);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
+    padding: clamp(0.75rem, 1.5vw, 1.5rem);
+    border: 1px solid color-mix(in srgb, var(--fdg-border) 74%, transparent);
+    border-radius: 1.5rem;
+    background-color: var(--fdg-page-bg);
+    background-image:
+        radial-gradient(
+            circle at 88% 4%,
+            color-mix(in srgb, var(--primary-400, #818cf8) 14%, transparent),
+            transparent 28rem
+        ),
+        radial-gradient(circle, var(--fdg-page-dot) 0.75px, transparent 0.85px);
+    background-size:
+        auto,
+        1.5rem 1.5rem;
 }
 
 .dark .fdg-page {
     --fdg-border: var(--gray-700, #374151);
+    --fdg-border-strong: var(--gray-600, #4b5563);
     --fdg-bg: var(--gray-900, #111827);
     --fdg-bg-muted: var(--gray-800, #1f2937);
     --fdg-text: var(--gray-200, #e5e7eb);
     --fdg-text-muted: var(--gray-400, #9ca3af);
     --fdg-accent: var(--primary-400, #818cf8);
     --fdg-danger: var(--danger-400, #f87171);
+    --fdg-grid-dot: rgb(148 163 184 / 0.18);
+    --fdg-page-dot: color-mix(in srgb, var(--gray-500, #6b7280) 22%, transparent);
+    --fdg-page-bg: color-mix(in srgb, var(--gray-950, #030712) 92%, var(--primary-950, #312e81));
+    --fdg-surface: color-mix(in srgb, var(--gray-900, #111827) 95%, var(--primary-950, #312e81));
+    --fdg-shadow:
+        0 1px 2px rgb(0 0 0 / 0.2),
+        0 24px 60px rgb(0 0 0 / 0.28);
 }
 
 /* Toolbar */
 
-/* Laid out inside a native fi-section, which owns the card chrome. */
+.fdg-command-bar.fi-section {
+    border-color: color-mix(in srgb, var(--fdg-border) 82%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--fdg-surface) 92%, transparent);
+    box-shadow: var(--fdg-shadow);
+    backdrop-filter: blur(18px);
+}
+
 .fdg-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.875rem;
 }
 
 .fdg-toolbar-group {
@@ -44,6 +81,7 @@
 .fdg-label {
     font-size: 0.75rem;
     font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--fdg-text-muted);
 }
 
@@ -78,9 +116,10 @@
     max-height: 20rem;
     overflow-y: auto;
     border: 1px solid var(--fdg-border);
-    border-radius: 0.5rem;
-    background: var(--fdg-bg);
-    box-shadow: 0 10px 25px rgb(0 0 0 / 0.12);
+    border-radius: 0.75rem;
+    background: var(--fdg-surface);
+    box-shadow: var(--fdg-shadow);
+    overflow: hidden auto;
 }
 
 .fdg-search-group-title {
@@ -98,12 +137,15 @@
     align-items: flex-start;
     gap: 0.125rem;
     width: 100%;
-    padding: 0.375rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     background: transparent;
     border: none;
     text-align: left;
     cursor: pointer;
     color: var(--fdg-text);
+    transition:
+        color 150ms ease,
+        background-color 150ms ease;
 }
 
 .fdg-search-result:hover {
@@ -124,46 +166,89 @@
 /* Layout regions */
 
 .fdg-layout {
+    position: relative;
     display: grid;
-    grid-template-columns: 15rem minmax(0, 1fr);
-    gap: 1rem;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    gap: 1.25rem;
     align-items: start;
 }
 
-.fdg-layout.fdg-has-inspector {
-    grid-template-columns: 15rem minmax(0, 1fr) 19rem;
+.fdg-view-graph .fdg-workspace {
+    grid-column: 2;
+    grid-row: 1;
 }
 
-/* The cards themselves are native fi-section components; these rules only
-   handle sizing inside the page grid. */
-.fdg-explorer,
-.fdg-inspector {
-    max-height: 75vh;
+/* Expanded graph mode gives the canvas the explorer column as well. */
+.fdg-layout.fdg-view-graph.fdg-layout-expanded {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.fdg-view-graph.fdg-layout-expanded .fdg-explorer {
+    display: none;
+}
+
+.fdg-view-graph.fdg-layout-expanded .fdg-workspace {
+    grid-column: 1;
+}
+
+/* The explorer is a native fi-section component; this rule only handles its
+   sizing inside the page grid. */
+.fdg-explorer {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100dvh - 6rem);
     overflow-y: auto;
+    border-color: color-mix(in srgb, var(--fdg-border) 82%, transparent);
+    border-radius: 1.125rem;
+    background: var(--fdg-surface);
+    box-shadow: var(--fdg-shadow);
+}
+
+.fdg-explorer .fi-section-header {
+    border-bottom: 1px solid color-mix(in srgb, var(--fdg-border) 76%, transparent);
+}
+
+.fdg-explorer .fi-section-header-heading {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
 }
 
 .fdg-explorer-section {
-    margin-bottom: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
+    gap: 0.5rem;
+    padding-block: 0.125rem 1.125rem;
+}
+
+.fdg-explorer-section + .fdg-explorer-section {
+    padding-top: 1.125rem;
+    border-top: 1px solid color-mix(in srgb, var(--fdg-border) 74%, transparent);
 }
 
 .fdg-explorer-heading {
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.08em;
     color: var(--fdg-text-muted);
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.125rem;
 }
 
 .fdg-checkbox {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
+    gap: 0.625rem;
+    min-height: 1.75rem;
+    padding-inline: 0.125rem;
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
+    transition: color 150ms ease;
+}
+
+.fdg-checkbox:hover {
+    color: var(--fdg-accent);
 }
 
 /* The Filament checkbox carries a top margin meant for form field rows. */
@@ -182,16 +267,51 @@
 .fdg-workspace {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 1.25rem;
     min-width: 0;
+    padding: clamp(0.875rem, 1.5vw, 1.25rem);
+    border: 1px solid color-mix(in srgb, var(--fdg-border) 82%, transparent);
+    border-radius: 1.25rem;
+    background: var(--fdg-surface);
+    box-shadow: var(--fdg-shadow);
+}
+
+.fdg-workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3rem;
+}
+
+.fdg-workspace-heading {
+    min-width: 0;
+}
+
+.fdg-workspace-title {
+    color: var(--fdg-text);
+    font-size: clamp(1.0625rem, 1.5vw, 1.25rem);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
 }
 
 .fdg-workspace-meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
     font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
     color: var(--fdg-text-muted);
+}
+
+.fdg-workspace-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex: 0 0 auto;
 }
 
 .fdg-error {
@@ -213,11 +333,25 @@
 .fdg-graph-canvas {
     position: relative;
     border: 1px solid var(--fdg-border);
-    border-radius: 0.75rem;
-    background: var(--fdg-bg-muted);
-    height: 70vh;
-    min-height: 24rem;
+    border-radius: 1rem;
+    background-color: var(--fdg-bg-muted);
+    background-image: radial-gradient(circle, var(--fdg-grid-dot) 0.75px, transparent 0.9px);
+    background-position: -0.25rem -0.25rem;
+    background-size: 1.25rem 1.25rem;
+    height: clamp(32rem, calc(100dvh - 13.5rem), 64rem);
+    min-height: 32rem;
     overflow: hidden;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.55),
+        0 1px 2px rgb(15 23 42 / 0.03);
+}
+
+.dark .fdg-graph-canvas {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.fdg-view-graph.fdg-layout-expanded .fdg-graph-canvas {
+    height: clamp(38rem, calc(100dvh - 9rem), 72rem);
 }
 
 .fdg-graph-container {
@@ -231,65 +365,209 @@
     right: 0.75rem;
     z-index: 10;
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid var(--fdg-border);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--fdg-surface) 92%, transparent);
+    box-shadow:
+        0 10px 30px color-mix(in srgb, var(--primary-950, #312e81) 10%, transparent),
+        inset 0 1px 0 rgb(255 255 255 / 0.5);
+    backdrop-filter: blur(12px);
+}
+
+.dark .fdg-graph-controls {
+    box-shadow:
+        0 10px 28px rgb(0 0 0 / 0.24),
+        inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+.fdg-graph-controls .fi-btn,
+.fdg-graph-controls .fi-icon-btn {
+    box-shadow: none;
+}
+
+.fdg-graph-controls-divider {
+    width: 1px;
+    height: 1rem;
+    margin: 0 0.125rem;
+    flex: 0 0 1px;
+    background: var(--fdg-border);
+}
+
+[x-cloak] {
+    display: none !important;
 }
 
 /* Inspector */
 
-.fdg-inspector-header {
+.fdg-inspector-inner {
+    --fdg-inspector-border: var(--gray-200, #e5e7eb);
+    --fdg-inspector-surface: var(--color-white, #ffffff);
+    --fdg-inspector-surface-muted: var(--gray-50, #f9fafb);
+    --fdg-inspector-text: var(--gray-950, #111827);
+    --fdg-inspector-text-muted: var(--gray-500, #6b7280);
+
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+    color: var(--fdg-inspector-text);
+}
+
+.dark .fdg-inspector-inner {
+    --fdg-inspector-border: var(--gray-700, #374151);
+    --fdg-inspector-surface: var(--gray-900, #111827);
+    --fdg-inspector-surface-muted: color-mix(
+        in srgb,
+        var(--gray-800, #1f2937) 86%,
+        var(--primary-950, #312e81)
+    );
+    --fdg-inspector-text: var(--gray-100, #f3f4f6);
+    --fdg-inspector-text-muted: var(--gray-400, #9ca3af);
+}
+
+.fdg-inspector-summary {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    gap: 0.75rem;
 }
 
-.fdg-inspector-title {
-    font-size: 1rem;
-    font-weight: 700;
+.fdg-inspector-type .fi-badge-label {
+    letter-spacing: 0.01em;
 }
 
-.fdg-inspector-subtitle {
-    font-size: 0.8125rem;
-    color: var(--fdg-text-muted);
+.fdg-inspector-sections {
+    display: grid;
+    gap: 0.875rem;
 }
 
-.fdg-inspector-section {
-    margin-top: 1rem;
+.fdg-inspector-section .fi-section-header-heading {
+    font-size: 0.875rem;
+    letter-spacing: -0.01em;
 }
 
-.fdg-inspector-section-title {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--fdg-text-muted);
-    margin-bottom: 0.375rem;
+.fdg-inspector-entries {
+    display: flex;
+    flex-direction: column;
 }
 
 .fdg-inspector-entry {
-    display: flex;
-    flex-direction: column;
-    padding: 0.25rem 0;
-    font-size: 0.8125rem;
+    min-width: 0;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid
+        color-mix(in srgb, var(--fdg-inspector-border) 68%, transparent);
+}
+
+.fdg-inspector-entry:first-child {
+    padding-top: 0;
+}
+
+.fdg-inspector-entry:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
 }
 
 .fdg-inspector-entry dt {
+    margin-bottom: 0.35rem;
+    color: var(--fdg-inspector-text-muted);
+    font-size: 0.6875rem;
     font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
 }
 
 .fdg-inspector-entry dd {
-    color: var(--fdg-text-muted);
-    word-break: break-word;
+    min-width: 0;
+    color: var(--fdg-inspector-text);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.fdg-inspector-code {
+    min-width: 0;
+}
+
+.fdg-inspector-code .fdg-inspector-copyable {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--fdg-inspector-text);
+    font-size: 0.75rem;
+    line-height: 1.55;
+}
+
+.fdg-inspector-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
 }
 
 .fdg-inspector-list {
-    list-style: disc;
-    padding-left: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 0;
+    list-style: none;
+}
+
+.fdg-inspector-list li {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border: 1px solid
+        color-mix(in srgb, var(--fdg-inspector-border) 68%, transparent);
+    border-radius: 0.5rem;
+    background: var(--fdg-inspector-surface);
+}
+
+.fdg-inspector-list li > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.fdg-inspector-list-icon {
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.125rem;
+    color: var(--primary-500, #6366f1);
+}
+
+.fdg-inspector-empty {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--fdg-inspector-text-muted);
+    font-size: 0.75rem;
+}
+
+.fdg-inspector-empty-success {
+    color: var(--success-600, #16a34a);
+}
+
+.dark .fdg-inspector-empty-success {
+    color: var(--success-400, #4ade80);
+}
+
+.fdg-inspector-empty-icon {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+}
+
+.fdg-inspector-placeholder {
+    color: var(--fdg-inspector-text-muted);
+}
+
+.fdg-inspector-value {
+    overflow-wrap: anywhere;
 }
 
 .fdg-muted {
-    color: var(--fdg-text-muted);
+    color: var(--gray-500, #6b7280);
 }
 
 /* Tree */
@@ -327,77 +605,104 @@
     padding: 0;
 }
 
-/* Tables */
+/* Native Filament table */
 
-.fdg-tables {
+.fdg-table-browser {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.875rem;
 }
 
-.fdg-table-scroll {
+.fdg-table-switcher {
     overflow-x: auto;
-    border: 1px solid var(--fdg-border);
-    border-radius: 0.75rem;
+    padding-bottom: 0.125rem;
 }
 
-.fdg-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
+.fdg-table-switcher .fi-tabs {
+    width: max-content;
+    min-width: 100%;
 }
 
-.fdg-table th {
-    text-align: left;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--fdg-border);
-    color: var(--fdg-text-muted);
-    white-space: nowrap;
+.fdg-native-table .fi-ta {
+    overflow: hidden;
+    border-color: color-mix(in srgb, var(--fdg-border) 86%, transparent);
+    border-radius: 0.9375rem;
+    box-shadow: none;
 }
 
-.fdg-table th button {
-    border: none;
-    background: transparent;
-    font: inherit;
-    color: inherit;
-    font-weight: 600;
-    cursor: pointer;
+.fdg-native-table .fi-ta-header {
+    background: color-mix(in srgb, var(--fdg-bg-muted) 72%, transparent);
 }
 
-.fdg-table td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--fdg-border);
+.fdg-native-table-record {
+    transition:
+        background-color 160ms ease,
+        transform 160ms ease;
 }
 
-.fdg-table-row {
-    cursor: pointer;
-}
-
-.fdg-table-row:hover {
-    background: var(--fdg-bg-muted);
+.fdg-native-table-record:active {
+    transform: scale(0.997);
 }
 
 /* Responsive */
 
 @media (max-width: 1024px) {
     .fdg-layout,
-    .fdg-layout.fdg-has-inspector {
+    .fdg-layout.fdg-view-graph.fdg-layout-expanded {
         grid-template-columns: 1fr;
     }
 
     .fdg-explorer {
+        position: static;
         max-height: none;
     }
 
-    .fdg-inspector {
-        position: fixed;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        width: min(22rem, 90vw);
-        z-index: 40;
-        border-radius: 0;
-        max-height: none;
-        box-shadow: -10px 0 30px rgb(0 0 0 / 0.2);
+    .fdg-view-graph .fdg-workspace {
+        grid-column: 1;
+    }
+
+    .fdg-workspace-header {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .fdg-page {
+        padding: 0.625rem;
+        border-radius: 1rem;
+    }
+
+    .fdg-toolbar-group,
+    .fdg-toolbar-group:last-child {
+        flex-wrap: wrap;
+    }
+
+    .fdg-workspace {
+        padding: 0.75rem;
+        border-radius: 1rem;
+    }
+
+    .fdg-workspace-header {
+        flex-direction: column;
+    }
+
+    .fdg-workspace-actions {
+        width: 100%;
+    }
+
+    .fdg-workspace-actions .fi-input-wrp {
+        flex: 1;
+    }
+
+    .fdg-graph-canvas,
+    .fdg-view-graph.fdg-layout-expanded .fdg-graph-canvas {
+        height: 70dvh;
+        min-height: 24rem;
+    }
+
+    .fdg-graph-controls {
+        top: 0.5rem;
+        right: 0.5rem;
+        max-width: calc(100% - 1rem);
     }
 }

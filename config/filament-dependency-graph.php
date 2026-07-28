@@ -104,6 +104,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Livewire component discovery
+    |--------------------------------------------------------------------------
+    |
+    | Components are scanned independently from Filament panels and appear
+    | in the Laravel scope. The legacy app/Http/Livewire convention remains
+    | enabled alongside the current app/Livewire directory.
+    |
+    */
+
+    'livewire' => [
+        'enabled' => true,
+        'paths' => [
+            app_path('Livewire'),
+            app_path('Http/Livewire'),
+        ],
+        'namespaces' => [
+            'App\\Livewire\\',
+            'App\\Http\\Livewire\\',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Discovery behavior
     |--------------------------------------------------------------------------
     |

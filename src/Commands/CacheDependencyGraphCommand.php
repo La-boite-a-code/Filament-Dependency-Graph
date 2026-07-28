@@ -55,6 +55,7 @@ final class CacheDependencyGraphCommand extends Command
         $this->components->twoColumnDetail('Relations', (string) count($snapshot->relations));
         $this->components->twoColumnDetail('Resources', (string) count($snapshot->resources));
         $this->components->twoColumnDetail('Panels', (string) count($snapshot->panels));
+        $this->components->twoColumnDetail('Livewire components', (string) count($snapshot->livewireComponents));
         $this->components->twoColumnDetail('Warnings', (string) count($snapshot->warnings));
 
         foreach ($snapshot->warnings as $warning) {

@@ -68,6 +68,14 @@ abstract class TestCase extends Orchestra
             $config->set('filament-dependency-graph.model_namespaces', [
                 'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Models\\',
             ]);
+
+            $config->set('filament-dependency-graph.livewire.paths', [
+                __DIR__ . '/Fixtures/Livewire',
+            ]);
+
+            $config->set('filament-dependency-graph.livewire.namespaces', [
+                'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Livewire\\',
+            ]);
         });
     }
 
@@ -80,6 +88,8 @@ abstract class TestCase extends Orchestra
         $defaults = [
             'modelPaths' => [__DIR__ . '/Fixtures/Models'],
             'modelNamespaces' => ['LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Models\\'],
+            'livewirePaths' => [__DIR__ . '/Fixtures/Livewire'],
+            'livewireNamespaces' => ['LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Livewire\\'],
             'basePath' => dirname(__DIR__),
             'vendorPath' => dirname(__DIR__) . '/vendor',
         ];

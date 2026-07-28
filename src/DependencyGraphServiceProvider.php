@@ -24,6 +24,7 @@ use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
 use LaBoiteACode\DependencyGraph\Contracts\DependencyGraphManager;
 use LaBoiteACode\DependencyGraph\Contracts\GraphBuilder;
 use LaBoiteACode\DependencyGraph\Contracts\GraphCache;
+use LaBoiteACode\DependencyGraph\Contracts\LivewireComponentDiscoverer as LivewireComponentDiscovererContract;
 use LaBoiteACode\DependencyGraph\Contracts\ModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\NodeInspector;
 use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
@@ -35,6 +36,7 @@ use LaBoiteACode\DependencyGraph\Discovery\EloquentRelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\FilamentPanelDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\FilamentResourceDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\LaravelApplicationDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\LivewireComponentDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\ModelInstantiator;
 use LaBoiteACode\DependencyGraph\Discovery\Support\SchemaInspector;
 use LaBoiteACode\DependencyGraph\Domain\Exceptions\InvalidConfigurationException;
@@ -43,6 +45,7 @@ use LaBoiteACode\DependencyGraph\Export\JsonGraphExporter;
 use LaBoiteACode\DependencyGraph\Export\MermaidGraphExporter;
 use LaBoiteACode\DependencyGraph\Graph\DefaultGraphBuilder;
 use LaBoiteACode\DependencyGraph\Inspection\DefaultNodeInspector;
+use LaBoiteACode\DependencyGraph\Inspection\LivewireComponentInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ModelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\PanelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ResourceInspector;
@@ -87,6 +90,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
         $this->app->singleton(RelationDiscoverer::class, EloquentRelationDiscoverer::class);
         $this->app->singleton(PanelDiscoverer::class, FilamentPanelDiscoverer::class);
         $this->app->singleton(ResourceDiscoverer::class, FilamentResourceDiscoverer::class);
+        $this->app->singleton(LivewireComponentDiscovererContract::class, LivewireComponentDiscoverer::class);
         $this->app->singleton(ApplicationDiscovery::class, LaravelApplicationDiscoverer::class);
         $this->app->singleton(GraphBuilder::class, DefaultGraphBuilder::class);
 
@@ -131,6 +135,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
             return new DefaultNodeInspector([
                 new ModelInspector,
                 new ResourceInspector,
+                new LivewireComponentInspector,
                 new PanelInspector,
             ]);
         });

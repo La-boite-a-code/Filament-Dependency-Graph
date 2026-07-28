@@ -8,6 +8,7 @@ it('caches the snapshot and reports counts', function (): void {
     $this->artisan('filament-dependency-graph:cache')
         ->expectsOutputToContain('Dependency graph snapshot cached.')
         ->expectsOutputToContain('Models')
+        ->expectsOutputToContain('Livewire components')
         ->expectsOutputToContain('Warnings')
         ->assertSuccessful();
 });
@@ -25,7 +26,7 @@ it('rejects an invalid scope option', function (): void {
 
 it('exports json to standard output', function (): void {
     $this->artisan('filament-dependency-graph:export', ['--format' => 'json'])
-        ->expectsOutputToContain('"schemaVersion": "1.0"')
+        ->expectsOutputToContain('"schemaVersion": "1.1"')
         ->assertSuccessful();
 });
 
@@ -54,7 +55,7 @@ it('writes the export to a file', function (): void {
 
     $decoded = json_decode((string) file_get_contents($path), true);
 
-    expect($decoded['schemaVersion'])->toBe('1.0');
+    expect($decoded['schemaVersion'])->toBe('1.1');
 
     File::deleteDirectory(dirname($path));
 });

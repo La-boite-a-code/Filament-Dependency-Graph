@@ -6,12 +6,14 @@ namespace LaBoiteACode\DependencyGraph\Discovery;
 
 use DateTimeImmutable;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
+use LaBoiteACode\DependencyGraph\Contracts\LivewireComponentDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\RelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ResourceDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
+use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationData;
@@ -19,6 +21,7 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\ResourceData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\RelationType;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
+use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use Throwable;
 
 /**
@@ -35,6 +38,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         private readonly RelationDiscoverer $relationDiscoverer,
         private readonly PanelDiscoverer $panelDiscoverer,
         private readonly ResourceDiscoverer $resourceDiscoverer,
+        private readonly LivewireComponentDiscoverer $livewireComponentDiscoverer,
     ) {}
 
     public function discover(DiscoveryContext $context): ApplicationSnapshot
@@ -43,9 +47,11 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
 
         $panels = $this->discoverPanels($context);
         $resources = $this->discoverResources($context);
+        $livewireComponents = $this->discoverLivewireComponents($context);
         $models = $this->discoverModels($context);
 
         $models = $this->addResourceModels($models, $resources, $context);
+        $models = $this->addLivewireComponentModels($models, $livewireComponents, $context);
 
         [$models, $relations] = $this->discoverRelations($models, $context);
 
@@ -55,17 +61,29 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         usort($relations, static fn (RelationData $a, RelationData $b): int => strcmp($a->id, $b->id));
         usort($resources, static fn (ResourceData $a, ResourceData $b): int => strcmp($a->id, $b->id));
         usort($panels, static fn (PanelData $a, PanelData $b): int => strcmp($a->id, $b->id));
+        usort(
+            $livewireComponents,
+            static fn (LivewireComponentData $a, LivewireComponentData $b): int => strcmp($a->id, $b->id),
+        );
 
-        $warnings = $this->aggregateWarnings($models, $relations, $resources);
+        $warnings = $this->aggregateWarnings($models, $relations, $resources, $livewireComponents);
 
         return new ApplicationSnapshot(
-            fingerprint: $this->fingerprint($context, $models, $relations, $resources, $panels),
+            fingerprint: $this->fingerprint(
+                $context,
+                $models,
+                $relations,
+                $resources,
+                $panels,
+                $livewireComponents,
+            ),
             generatedAt: new DateTimeImmutable,
             models: $models,
             relations: $relations,
             resources: $resources,
             panels: $panels,
             warnings: $warnings,
+            livewireComponents: $livewireComponents,
         );
     }
 
@@ -114,6 +132,28 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
     }
 
     /**
+     * @return list<LivewireComponentData>
+     */
+    private function discoverLivewireComponents(DiscoveryContext $context): array
+    {
+        try {
+            $components = $this->livewireComponentDiscoverer->discover($context);
+        } catch (Throwable $exception) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'livewire_component_discovery_failed',
+                message: sprintf('Livewire component discovery failed: %s', $exception->getMessage()),
+                exceptionClass: $exception::class,
+            );
+
+            $components = [];
+        }
+
+        $this->drainWarnings($this->livewireComponentDiscoverer);
+
+        return $components;
+    }
+
+    /**
      * @return array<string, ModelData> Keyed by stable model id.
      */
     private function discoverModels(DiscoveryContext $context): array
@@ -148,6 +188,39 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
 
             if ($model !== null) {
                 $models[$model->id] = $model;
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * Models referenced by Livewire component properties, actions or source
+     * code take part in the Laravel graph even when they live outside the
+     * configured model paths.
+     *
+     * @param  array<string, ModelData>  $models
+     * @param  list<LivewireComponentData>  $components
+     * @return array<string, ModelData>
+     */
+    private function addLivewireComponentModels(
+        array $models,
+        array $components,
+        DiscoveryContext $context,
+    ): array {
+        foreach ($components as $component) {
+            foreach (array_keys($component->modelReferences) as $modelClass) {
+                $modelId = StableIdentifier::model($modelClass);
+
+                if (isset($models[$modelId])) {
+                    continue;
+                }
+
+                $model = $this->discoverSingleClass($modelClass, $context);
+
+                if ($model !== null) {
+                    $models[$model->id] = $model;
+                }
             }
         }
 
@@ -292,10 +365,15 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
      * @param  list<ModelData>  $models
      * @param  list<RelationData>  $relations
      * @param  list<ResourceData>  $resources
+     * @param  list<LivewireComponentData>  $livewireComponents
      * @return list<DiscoveryWarning>
      */
-    private function aggregateWarnings(array $models, array $relations, array $resources): array
-    {
+    private function aggregateWarnings(
+        array $models,
+        array $relations,
+        array $resources,
+        array $livewireComponents,
+    ): array {
         $warnings = $this->warnings;
 
         foreach ($models as $model) {
@@ -329,6 +407,16 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             }
         }
 
+        foreach ($livewireComponents as $component) {
+            foreach ($component->warnings as $message) {
+                $warnings[] = new DiscoveryWarning(
+                    type: 'livewire_component_discovery',
+                    message: $message,
+                    class: $component->class,
+                );
+            }
+        }
+
         usort($warnings, static function (DiscoveryWarning $a, DiscoveryWarning $b): int {
             return [$a->type, $a->class ?? '', $a->method ?? '', $a->message]
                 <=> [$b->type, $b->class ?? '', $b->method ?? '', $b->message];
@@ -342,6 +430,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
      * @param  list<RelationData>  $relations
      * @param  list<ResourceData>  $resources
      * @param  list<PanelData>  $panels
+     * @param  list<LivewireComponentData>  $livewireComponents
      */
     private function fingerprint(
         DiscoveryContext $context,
@@ -349,6 +438,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         array $relations,
         array $resources,
         array $panels,
+        array $livewireComponents,
     ): string {
         $payload = json_encode([
             'context' => $context->toArray(),
@@ -356,6 +446,10 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             'relations' => array_map(static fn (RelationData $relation): array => $relation->toArray(), $relations),
             'resources' => array_map(static fn (ResourceData $resource): array => $resource->toArray(), $resources),
             'panels' => array_map(static fn (PanelData $panel): array => $panel->toArray(), $panels),
+            'livewire_components' => array_map(
+                static fn (LivewireComponentData $component): array => $component->toArray(),
+                $livewireComponents,
+            ),
         ]);
 
         return sha1($payload === false ? '' : $payload);

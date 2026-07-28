@@ -47,6 +47,7 @@ final class DefaultGraphBuilder implements GraphBuilder
         }
 
         $modelIdsWithResource = [];
+        $modelIdsWithLivewire = [];
 
         foreach ($snapshot->resources as $resource) {
             if ($resource->modelId !== null) {
@@ -54,8 +55,19 @@ final class DefaultGraphBuilder implements GraphBuilder
             }
         }
 
+        foreach ($snapshot->livewireComponents as $component) {
+            foreach ($component->modelIds() as $modelId) {
+                $modelIdsWithLivewire[$modelId] = true;
+            }
+        }
+
         foreach ($snapshot->models as $model) {
             $node = $this->nodes->forModel($model);
+            $nodes[$node->id->value] = $node;
+        }
+
+        foreach ($snapshot->livewireComponents as $component) {
+            $node = $this->nodes->forLivewireComponent($component);
             $nodes[$node->id->value] = $node;
         }
 
@@ -73,6 +85,13 @@ final class DefaultGraphBuilder implements GraphBuilder
 
             $edge = $this->edges->resourceUsesModel($resource, $resource->modelId);
             $edges[$edge->id->value] = $edge;
+        }
+
+        foreach ($snapshot->livewireComponents as $component) {
+            foreach ($component->modelReferences as $modelClass => $references) {
+                $edge = $this->edges->livewireUsesModel($component, $modelClass, $references);
+                $edges[$edge->id->value] = $edge;
+            }
         }
 
         foreach ($snapshot->relations as $relation) {
@@ -101,6 +120,7 @@ final class DefaultGraphBuilder implements GraphBuilder
             $nodes,
             $snapshot,
             $modelIdsWithResource,
+            $modelIdsWithLivewire,
             new Graph(array_values($nodes), array_values($edges)),
         );
 
@@ -113,12 +133,14 @@ final class DefaultGraphBuilder implements GraphBuilder
     /**
      * @param  array<string, Node>  $nodes
      * @param  array<string, true>  $modelIdsWithResource
+     * @param  array<string, true>  $modelIdsWithLivewire
      * @return array<string, Node>
      */
     private function applyDerivedBadges(
         array $nodes,
         ApplicationSnapshot $snapshot,
         array $modelIdsWithResource,
+        array $modelIdsWithLivewire,
         Graph $graph,
     ): array {
         $orphanIds = array_flip($this->orphans->detect($graph));
@@ -139,6 +161,7 @@ final class DefaultGraphBuilder implements GraphBuilder
             $badges = $this->modelBadges(
                 $model,
                 hasResource: isset($modelIdsWithResource[$model->id]),
+                usedByLivewire: isset($modelIdsWithLivewire[$model->id]),
                 isOrphan: isset($orphanIds[$model->id]),
                 isInCycle: isset($cycleIds[$model->id]),
             );
@@ -152,9 +175,18 @@ final class DefaultGraphBuilder implements GraphBuilder
     /**
      * @return list<string>
      */
-    private function modelBadges(ModelData $model, bool $hasResource, bool $isOrphan, bool $isInCycle): array
-    {
+    private function modelBadges(
+        ModelData $model,
+        bool $hasResource,
+        bool $usedByLivewire,
+        bool $isOrphan,
+        bool $isInCycle,
+    ): array {
         $badges = [$hasResource ? 'Resource' : 'No Resource'];
+
+        if ($usedByLivewire) {
+            $badges[] = 'Livewire';
+        }
 
         if ($model->softDeletes) {
             $badges[] = 'SoftDeletes';

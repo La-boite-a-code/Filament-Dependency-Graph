@@ -16,6 +16,7 @@ final readonly class ApplicationSnapshot
      * @param  list<ResourceData>  $resources
      * @param  list<PanelData>  $panels
      * @param  list<DiscoveryWarning>  $warnings
+     * @param  list<LivewireComponentData>  $livewireComponents
      */
     public function __construct(
         public string $fingerprint,
@@ -25,6 +26,7 @@ final readonly class ApplicationSnapshot
         public array $resources,
         public array $panels,
         public array $warnings,
+        public array $livewireComponents = [],
     ) {}
 
     /**
@@ -32,7 +34,7 @@ final readonly class ApplicationSnapshot
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{fingerprint: string, generated_at: string, models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, panels: list<array{id: string, path: string|null, domain: string|null, resource_ids: list<string>}>, warnings: list<array{type: string, message: string, class?: string|null, method?: string|null, exception_class?: string|null}>} $data */
+        /** @var array{fingerprint: string, generated_at: string, models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, panels: list<array{id: string, path: string|null, domain: string|null, resource_ids: list<string>}>, warnings: list<array{type: string, message: string, class?: string|null, method?: string|null, exception_class?: string|null}>, livewire_components?: list<array<string, mixed>>} $data */
         return new self(
             fingerprint: $data['fingerprint'],
             generatedAt: new DateTimeImmutable($data['generated_at']),
@@ -55,6 +57,10 @@ final readonly class ApplicationSnapshot
             warnings: array_map(
                 static fn (array $warning): DiscoveryWarning => DiscoveryWarning::fromArray($warning),
                 $data['warnings'],
+            ),
+            livewireComponents: array_map(
+                static fn (array $component): LivewireComponentData => LivewireComponentData::fromArray($component),
+                $data['livewire_components'] ?? [],
             ),
         );
     }
@@ -82,6 +88,10 @@ final readonly class ApplicationSnapshot
             'panels' => array_map(
                 static fn (PanelData $panel): array => $panel->toArray(),
                 $this->panels,
+            ),
+            'livewire_components' => array_map(
+                static fn (LivewireComponentData $component): array => $component->toArray(),
+                $this->livewireComponents,
             ),
             'warnings' => array_map(
                 static fn (DiscoveryWarning $warning): array => $warning->toArray(),
@@ -128,6 +138,17 @@ final readonly class ApplicationSnapshot
         foreach ($this->panels as $panel) {
             if ($panel->id === $panelId) {
                 return $panel;
+            }
+        }
+
+        return null;
+    }
+
+    public function livewireComponent(string $componentId): ?LivewireComponentData
+    {
+        foreach ($this->livewireComponents as $component) {
+            if ($component->id === $componentId) {
+                return $component;
             }
         }
 

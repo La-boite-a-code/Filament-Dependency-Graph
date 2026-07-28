@@ -55,6 +55,8 @@ class DependencyGraphPlugin implements Plugin
 
     protected ?bool $vendorModelsScanned = null;
 
+    protected ?bool $livewireComponentsScanned = null;
+
     protected ?bool $panelNodesShown = null;
 
     protected ?bool $resourceNodesShown = null;
@@ -67,6 +69,12 @@ class DependencyGraphPlugin implements Plugin
 
     /** @var list<string> */
     protected array $modelNamespaces = [];
+
+    /** @var list<string> */
+    protected array $livewirePaths = [];
+
+    /** @var list<string> */
+    protected array $livewireNamespaces = [];
 
     /** @var list<GraphExporter> */
     protected array $exporters = [];
@@ -304,6 +312,13 @@ class DependencyGraphPlugin implements Plugin
         return $this;
     }
 
+    public function scanLivewireComponents(bool $condition = true): static
+    {
+        $this->livewireComponentsScanned = $condition;
+
+        return $this;
+    }
+
     public function showPanelNodes(bool $condition = true): static
     {
         $this->panelNodesShown = $condition;
@@ -338,6 +353,20 @@ class DependencyGraphPlugin implements Plugin
     public function registerModelNamespace(string $namespace): static
     {
         $this->modelNamespaces[] = $namespace;
+
+        return $this;
+    }
+
+    public function registerLivewirePath(string $path): static
+    {
+        $this->livewirePaths[] = $path;
+
+        return $this;
+    }
+
+    public function registerLivewireNamespace(string $namespace): static
+    {
+        $this->livewireNamespaces[] = $namespace;
 
         return $this;
     }
@@ -438,6 +467,10 @@ class DependencyGraphPlugin implements Plugin
             $config->set('filament-dependency-graph.vendor_models.enabled', $this->vendorModelsScanned);
         }
 
+        if ($this->livewireComponentsScanned !== null) {
+            $config->set('filament-dependency-graph.livewire.enabled', $this->livewireComponentsScanned);
+        }
+
         if ($this->panelNodesShown !== null) {
             $config->set('filament-dependency-graph.graph.show_panel_nodes', $this->panelNodesShown);
         }
@@ -449,6 +482,8 @@ class DependencyGraphPlugin implements Plugin
         $this->mergeConfigList($config, 'exclude.classes', $this->excludedModels);
         $this->mergeConfigList($config, 'model_paths', $this->modelPaths);
         $this->mergeConfigList($config, 'model_namespaces', $this->modelNamespaces);
+        $this->mergeConfigList($config, 'livewire.paths', $this->livewirePaths);
+        $this->mergeConfigList($config, 'livewire.namespaces', $this->livewireNamespaces);
     }
 
     /**

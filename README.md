@@ -7,7 +7,7 @@
 
 > The visual architecture explorer for Filament.
 
-Explore models, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
+Explore models, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
 
 ![Filament Dependency Graph](art/banner.jpg)
 
@@ -20,6 +20,7 @@ Large Laravel and Filament applications are hard to understand because their str
 Install the package, register the plugin, open one page, and immediately answer:
 
 - Which models exist, and which resources expose them?
+- Which standalone Livewire components use each model?
 - Which panels contain those resources?
 - How are the models connected, and through which relation types?
 - Which models have no resource? Which are isolated?
@@ -28,12 +29,13 @@ Install the package, register the plugin, open one page, and immediately answer:
 
 ## Features
 
-- **Automatic discovery.** Eloquent models, relations, Filament panels, resources, pages and relation managers, with zero package-specific configuration on standard applications.
+- **Automatic discovery.** Eloquent models and relations, application Livewire components, Filament panels, resources, pages and relation managers, with zero package-specific configuration on standard applications.
+- **Project-wide Livewire visibility.** Components under `app/Livewire` or the legacy `app/Http/Livewire` convention appear in the Laravel scope even when they are not registered in a Filament panel. Typed properties, method signatures and explicit static model references become component-to-model dependencies without instantiating the component.
 - **Every Eloquent relation type.** belongsTo, hasOne, hasMany, belongsToMany, hasOneThrough, hasManyThrough, morphTo, morphOne, morphMany, morphToMany and morphedByMany, including morph maps.
 - **A readable graph.** Cytoscape.js with a layered dagre layout for the hierarchical mode and fCoSE for the force-directed mode. Relation labels only appear at readable zoom levels, selecting a node fades everything outside its neighborhood, and disconnected models are packed neatly instead of drifting over the graph.
 - **Native Filament look.** The whole page is built from Filament components (sections, tabs, buttons, selects, checkboxes, badges) and the graph palette reads your panel color scales at runtime, in light and dark mode.
 - **Tree and table views** for the same data, usable without the graph renderer.
-- **Contextual inspector** for models, resources, panels and relation edges: keys, pivot tables, morph metadata, traits, casts, diagnostics.
+- **Contextual inspector** for models, Livewire components, resources, panels and relation edges: keys, pivot tables, morph metadata, traits, casts, rendered views, public APIs and diagnostics.
 - **Search** across class names, labels, tables, namespaces, panels and relation methods, with deterministic ranking.
 - **Focus mode** with configurable depth and direction, shareable through the URL query string.
 - **Filters.** Panels, node types, relation types, namespace, vendor or application ownership, orphans only, circular dependencies only, models without resources only.
@@ -49,7 +51,7 @@ The CI matrix is the source of truth.
 
 | Package | PHP | Laravel | Filament |
 | ------- | --- | ------- | -------- |
-| 1.x     | 8.3, 8.4 | 12.x, 13.x | 4.x, 5.x |
+| 1.x     | 8.3, 8.4, 8.5 | 12.x, 13.x | 4.x, 5.x |
 
 ## Installation
 
@@ -90,12 +92,12 @@ DependencyGraphPlugin::make()
 
 ### Graph view
 
-The default view renders the dependency graph with typed nodes: panels, resource hexagons, model boxes and dashed polymorphic-target diamonds. Two layouts are available from the toolbar:
+The default view renders the dependency graph with typed nodes: panels, resource hexagons, Livewire components, model boxes and dashed polymorphic-target diamonds. Two layouts are available from the toolbar:
 
 - **Hierarchical** (default) - a layered dagre layout: panels on top, then resources, then models, with crossing minimisation.
 - **Force-directed** - fCoSE, which clusters tightly related models together and packs disconnected components side by side.
 
-Interactions: zoom and pan, drag nodes, click a node or an edge to open the inspector (the rest of the graph fades to keep focus), click the canvas to clear, `Fit` to re-center. Relation labels appear once the zoom makes them readable.
+Interactions: zoom and pan, drag nodes, click a node or an edge to open the native Filament inspector slide-over (the rest of the graph fades to keep focus), click the canvas to clear, use the explicit zoom controls or `Fit` to re-center. The expand control temporarily gives the explorer column back to the canvas; press `Esc` to restore it. Relation labels appear once the zoom makes them readable.
 
 ### Tree view
 
@@ -103,11 +105,11 @@ A cycle-safe, depth-limited expansion of the graph starting from the panels (or 
 
 ### Table view
 
-Three sortable tables - models, relations, resources - with counts, foreign keys, pivot tables, navigation groups and discovery status badges. Every row opens the inspector.
+A native Filament Table exposes four inventory categories - models, relations, Livewire components and resources - through compact tabs. Search, sorting, pagination, column visibility and empty states follow the panel behavior automatically. Counts, aliases, views, foreign keys, pivot tables, navigation groups and discovery status remain available, and every row opens the inspector.
 
 ### Inspector
 
-Selecting a node or an edge opens a side panel with everything the discovery collected: namespace, table, primary key, soft deletes, traits, casts, relation list with types and keys, pivot metadata, morph maps, panels and pages for resources, plus diagnostics when discovery was partial.
+Selecting a node or an edge opens a native Filament slide-over with everything the discovery collected: namespace, table, primary key, soft deletes, traits, casts, relation list with types and keys, pivot metadata, morph maps, Livewire aliases, rendered views and public APIs, panels and pages for resources, plus diagnostics when discovery was partial. Filament handles its focus trap, scroll lock, responsive placement and dismissal consistently with the rest of the panel.
 
 ### Focus mode
 
@@ -133,7 +135,7 @@ Press `/` and type: the search matches class names, labels, table names, namespa
 ## Scopes
 
 - **Filament scope** (default): starts from the resources registered in the selected panels and includes their models plus related models up to the configured depth.
-- **Laravel scope**: every discovered Eloquent model, including models that no resource exposes. Disable it entirely with `laravel_scope_enabled => false` or `->allowLaravelScope(false)`.
+- **Laravel scope**: every discovered Eloquent model and standalone Livewire component, including models that no resource exposes. Disable it entirely with `laravel_scope_enabled => false` or `->allowLaravelScope(false)`.
 
 ## Configuration
 
@@ -188,6 +190,19 @@ return [
         'namespaces' => [],
     ],
 
+    // Standalone Livewire components shown in the Laravel scope.
+    'livewire' => [
+        'enabled' => true,
+        'paths' => [
+            app_path('Livewire'),
+            app_path('Http/Livewire'),
+        ],
+        'namespaces' => [
+            'App\\Livewire\\',
+            'App\\Http\\Livewire\\',
+        ],
+    ],
+
     // Discovery behavior.
     'discovery' => [
         'relations' => true,
@@ -237,9 +252,12 @@ DependencyGraphPlugin::make()
     ->defaultDepth(2)
     ->allowLaravelScope()
     ->scanVendorModels(false)
+    ->scanLivewireComponents()
     ->excludeModels([AuditLog::class])
     ->registerModelPath(app_path('Domain'))
     ->registerModelNamespace('App\\Domain\\')
+    ->registerLivewirePath(app_path('Domain/Livewire'))
+    ->registerLivewireNamespace('App\\Domain\\Livewire\\')
     ->registerExporter(new MyGraphvizExporter())
     ->registerInspector(new MyAuditableInspector());
 ```
@@ -344,7 +362,8 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 use LaBoiteACode\DependencyGraph\Facades\DependencyGraph;
 
-// Raw discovery snapshot: models, relations, panels, resources, warnings.
+// Raw discovery snapshot: models, relations, Livewire components, panels,
+// resources and warnings.
 $snapshot = DependencyGraph::discover();
 
 // Full graph with the default query.
@@ -417,6 +436,8 @@ DependencyGraphPlugin::make()
 - **The page returns 404 outside your machine.** Expected: the page is local-only by default. Configure `canAccessUsing()` deliberately (see the security warning).
 - **The graph looks unstyled or outdated after an update.** Republish the Filament assets: `php artisan filament:assets`.
 - **Some models are missing.** Discovery scans `model_paths` and `model_namespaces`; add your custom locations there or with `registerModelPath()` / `registerModelNamespace()`. Vendor models are excluded unless `vendor_models.enabled` is true.
+- **A Livewire component is missing.** Add its source directory and namespace under `livewire.paths` / `livewire.namespaces`, or use `registerLivewirePath()` / `registerLivewireNamespace()`. Components are visible in the Laravel scope, not the Filament scope.
+- **A Livewire-to-model link is missing.** The read-only scanner recognizes model types on component properties and methods, plus explicit static references such as `Order::query()`. Dynamic container resolution and untyped variables cannot be inferred safely.
 - **A relation is not detected.** Untyped relation methods are only discovered through docblocks (enabled by default) or heuristic invocation (disabled by default, because it calls the methods). Add a return type to the relation method for the most reliable detection.
 - **A model shows a warning badge.** Discovery is resilient: the inspector's diagnostics section lists exactly what failed for that class.
 

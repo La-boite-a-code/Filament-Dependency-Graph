@@ -13,7 +13,7 @@ return [
         'view_graph' => 'Graphe',
         'view_tree' => 'Arbre',
         'view_table' => 'Table',
-        'search_placeholder' => 'Rechercher modeles, resources, panels...',
+        'search_placeholder' => 'Rechercher modeles, composants Livewire, resources, panels...',
         'export' => 'Exporter',
         'export_json' => 'Exporter en JSON',
         'export_mermaid' => 'Exporter en Mermaid',
@@ -22,6 +22,7 @@ return [
 
     'explorer' => [
         'title' => 'Explorateur',
+        'description' => 'Filtrer les panels, les types de noeuds et les relations',
         'panels' => 'Panels',
         'node_types' => 'Types de noeuds',
         'relation_types' => 'Types de relations',
@@ -48,11 +49,15 @@ return [
     'node_types' => [
         'panel' => 'Panels',
         'resource' => 'Resources',
+        'livewire_component' => 'Composants Livewire',
         'model' => 'Modeles',
         'polymorphic_target' => 'Cibles polymorphes',
     ],
 
     'workspace' => [
+        'graph_title' => 'Graphe de dependances',
+        'tree_title' => 'Arbre des dependances',
+        'table_title' => 'Inventaire du projet',
         'empty' => 'Aucun noeud ne correspond aux filtres actuels.',
         'error' => 'Le graphe n\'a pas pu etre construit :',
         'stats' => ':nodes noeuds, :edges liens',
@@ -60,13 +65,29 @@ return [
         'layout_hierarchical' => 'Hierarchique',
         'layout_force' => 'Force dirigee',
         'fit' => 'Ajuster a la vue',
+        'controls' => 'Controles du graphe',
+        'zoom_in' => 'Zoomer',
+        'zoom_out' => 'Dezoomer',
+        'expand' => 'Agrandir le graphe',
+        'collapse' => 'Afficher l’explorateur',
     ],
 
     'inspector' => [
         'title' => 'Inspecteur',
         'close' => 'Fermer l\'inspecteur',
         'focus_node' => 'Focus sur ce noeud',
+        'copy_value' => 'Copier la valeur',
+        'copied' => 'Copie effectuee',
         'empty_section' => 'Rien a afficher.',
+        'no_warnings' => 'Aucun avertissement detecte.',
+        'types' => [
+            'panel' => 'Panel Filament',
+            'resource' => 'Resource Filament',
+            'livewire_component' => 'Composant Livewire',
+            'model' => 'Modele Eloquent',
+            'polymorphic_target' => 'Cible polymorphe',
+            'edge' => 'Dependance',
+        ],
     ],
 
     'search' => [
@@ -79,11 +100,16 @@ return [
     ],
 
     'table' => [
+        'dataset_label' => 'Categorie de l\'inventaire',
+        'search_placeholder' => 'Rechercher dans cette categorie...',
+        'items' => ':count elements',
+        'empty' => 'Aucun element ne correspond aux filtres actuels.',
         'models' => 'Modeles',
         'model' => 'Modele',
         'namespace' => 'Namespace',
         'database_table' => 'Table',
         'resources_count' => 'Resources',
+        'livewire_components_count' => 'Livewire',
         'outgoing' => 'Sortantes',
         'incoming' => 'Entrantes',
         'soft_deletes' => 'SoftDeletes',
@@ -102,8 +128,20 @@ return [
         'navigation_group' => 'Groupe de navigation',
         'pages' => 'Pages',
         'relation_managers' => 'Relation managers',
+        'livewire_components' => 'Composants Livewire',
+        'component' => 'Composant',
+        'alias' => 'Alias',
+        'view' => 'Vue',
+        'models_count' => 'Modeles',
+        'properties' => 'Proprietes',
+        'methods_count' => 'Methodes',
         'yes' => 'Oui',
         'no' => 'Non',
         'unknown' => 'Inconnu',
+        'statuses' => [
+            'complete' => 'Complet',
+            'partial' => 'Partiel',
+            'failed' => 'Echec',
+        ],
     ],
 ];

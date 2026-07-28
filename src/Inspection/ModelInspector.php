@@ -30,12 +30,37 @@ final class ModelInspector implements NodeInspector
             sections: [
                 $this->identity($node),
                 $this->filamentUsage($node, $graph),
+                $this->livewireUsage($node, $graph),
                 $this->relationships($node, $graph),
                 $this->database($node),
                 $this->behavior($node),
                 $this->diagnostics($node),
             ],
         );
+    }
+
+    private function livewireUsage(Node $node, Graph $graph): InspectionSection
+    {
+        $components = [];
+
+        foreach ($graph->incomingEdges($node->id) as $edge) {
+            if ($edge->type !== EdgeType::LivewireUsesModel) {
+                continue;
+            }
+
+            $component = $graph->node($edge->source);
+
+            if ($component !== null) {
+                $components[] = $component->label;
+            }
+        }
+
+        $components = array_values(array_unique($components));
+        sort($components, SORT_STRING);
+
+        return new InspectionSection('livewire', 'Livewire usage', [
+            'Components' => $components,
+        ]);
     }
 
     private function identity(Node $node): InspectionSection

@@ -24,10 +24,59 @@ it('renders the page with native filament controls', function (): void {
         ->assertSeeHtml('fi-btn');
 });
 
+it('renders the inspector as a native filament slide-over', function (): void {
+    Livewire::test(DependencyGraphPage::class)
+        ->assertOk()
+        ->assertSeeHtml('data-fi-modal-id="fdg-inspector"')
+        ->assertSeeHtml('fi-modal-slide-over')
+        ->assertSeeHtml('x-teleport="body"')
+        ->assertSeeHtml('x-on:modal-closed.window');
+});
+
+it('presents inspector details with native Filament components', function (): void {
+    Livewire::test(DependencyGraphPage::class)
+        ->set('scope', 'laravel')
+        ->call(
+            'selectNode',
+            'model:la-boite-a-code.dependency-graph.tests.fixtures.models.order',
+        )
+        ->assertSeeHtml('fdg-inspector-summary')
+        ->assertSeeHtml('fdg-inspector-section')
+        ->assertSeeHtml('fdg-inspector-code')
+        ->assertSeeHtml('fi-badge')
+        ->assertSeeHtml('fi-copyable')
+        ->assertSeeHtml('window.navigator.clipboard.writeText')
+        ->assertDontSeeHtml('data-fdg-copy')
+        ->assertSee('Eloquent model')
+        ->assertSee('Copy value')
+        ->assertSee('Copied')
+        ->assertSee('No warnings detected.');
+});
+
+it('synchronizes the inspector slide-over with graph selection', function (): void {
+    Livewire::test(DependencyGraphPage::class)
+        ->call('selectNode', 'model:test')
+        ->assertSet('selectedNodeId', 'model:test')
+        ->assertSet('selectedEdgeId', null)
+        ->assertDispatched('open-modal', id: 'fdg-inspector')
+        ->call('clearSelection')
+        ->assertSet('selectedNodeId', null)
+        ->assertDispatched('close-modal', id: 'fdg-inspector')
+        ->assertDispatched('dependency-graph-clear-selection');
+
+    Livewire::test(DependencyGraphPage::class)
+        ->call('selectEdge', 'edge:test')
+        ->assertSet('selectedNodeId', null)
+        ->assertSet('selectedEdgeId', 'edge:test')
+        ->assertDispatched('open-modal', id: 'fdg-inspector');
+});
+
 it('renders the interactive graph canvas by default', function (): void {
     Livewire::test(DependencyGraphPage::class)
         ->assertOk()
-        ->assertSeeHtml('fdg-graph-container');
+        ->assertSeeHtml('fdg-graph-container')
+        ->assertSeeHtml('x-on:click="zoomIn()"')
+        ->assertSee('Expand graph');
 });
 
 it('switches views and keeps rendering', function (): void {
@@ -35,7 +84,32 @@ it('switches views and keeps rendering', function (): void {
         ->call('setView', 'tree')
         ->assertOk()
         ->call('setView', 'table')
-        ->assertOk();
+        ->assertOk()
+        ->assertSeeHtml('fdg-native-table')
+        ->assertSeeHtml('fi-ta');
+});
+
+it('uses the native filament table for every inventory category', function (): void {
+    Livewire::test(DependencyGraphPage::class)
+        ->call('setView', 'table')
+        ->assertTableColumnExists('label')
+        ->assertTableColumnExists('table')
+        ->sortTable('label', 'desc')
+        ->assertSet('tableSort', 'label:desc')
+        ->searchTable('definitely-not-a-project-record')
+        ->assertCountTableRecords(0)
+        ->call('setTableDataset', 'relations')
+        ->assertSet('tableDataset', 'relations')
+        ->assertTableColumnExists('method')
+        ->assertTableColumnExists('target')
+        ->call('setTableDataset', 'livewire_components')
+        ->assertSet('tableDataset', 'livewire_components')
+        ->assertTableColumnExists('view')
+        ->assertTableColumnExists('models')
+        ->call('setTableDataset', 'resources')
+        ->assertSet('tableDataset', 'resources')
+        ->assertTableColumnExists('navigation_group')
+        ->assertTableColumnExists('relation_managers');
 });
 
 it('toggles node types from the explorer checkboxes', function (): void {

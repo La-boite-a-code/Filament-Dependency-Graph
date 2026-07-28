@@ -5,6 +5,7 @@
     "type": "library",
     "keywords": [
         "laravel",
+        "livewire",
         "filament",
         "filament-plugin",
         "graph",

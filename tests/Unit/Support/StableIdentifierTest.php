@@ -18,6 +18,8 @@ it('builds identifiers matching the documented format', function (): void {
         ->and(StableIdentifier::model('App\\Models\\Order'))->toBe('model:app.models.order')
         ->and(StableIdentifier::resource('App\\Filament\\Resources\\OrderResource'))
         ->toBe('resource:app.filament.resources.order-resource')
+        ->and(StableIdentifier::livewireComponent('App\\Livewire\\OrderDashboard'))
+        ->toBe('livewire:app.livewire.order-dashboard')
         ->and(StableIdentifier::relation('App\\Models\\Order', 'customer'))
         ->toBe('relation:app.models.order:customer');
 });

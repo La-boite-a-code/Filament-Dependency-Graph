@@ -79,6 +79,15 @@ final class DiscoverApplication
                 'filament-dependency-graph.discovery.heuristic_relation_invocation',
                 false,
             ),
+            discoverLivewireComponents: (bool) $this->config->get('filament-dependency-graph.livewire.enabled', true),
+            livewirePaths: $this->stringList('livewire.paths', [
+                $this->app->basePath('app/Livewire'),
+                $this->app->basePath('app/Http/Livewire'),
+            ]),
+            livewireNamespaces: $this->stringList('livewire.namespaces', [
+                'App\\Livewire\\',
+                'App\\Http\\Livewire\\',
+            ]),
             panelIds: [],
             basePath: $this->app->basePath(),
             vendorPath: $this->app->basePath('vendor'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Graph;
 
+use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ResourceData;
@@ -87,6 +88,35 @@ final class EdgeFactory
                 'warnings' => $relation->warnings,
             ],
             status: $relation->status,
+        );
+    }
+
+    /**
+     * @param  list<string>  $references
+     */
+    public function livewireUsesModel(
+        LivewireComponentData $component,
+        string $modelClass,
+        array $references,
+    ): Edge {
+        $modelId = StableIdentifier::model($modelClass);
+
+        return new Edge(
+            id: EdgeId::fromString(StableIdentifier::edge(
+                EdgeType::LivewireUsesModel,
+                $component->id,
+                $modelId,
+            )),
+            source: NodeId::fromString($component->id),
+            target: NodeId::fromString($modelId),
+            type: EdgeType::LivewireUsesModel,
+            label: 'uses',
+            metadata: [
+                'component_class' => $component->class,
+                'model_class' => $modelClass,
+                'references' => $references,
+            ],
+            status: $component->status,
         );
     }
 }

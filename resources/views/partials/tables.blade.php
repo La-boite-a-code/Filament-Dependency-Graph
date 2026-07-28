@@ -1,130 +1,24 @@
 @php
-    $tables = $this->getTables();
-    $t = fn (string $key): string => __('filament-dependency-graph::graph.table.' . $key);
-    $bool = fn (?bool $value): string => $value === null
-        ? __('filament-dependency-graph::graph.table.unknown')
-        : ($value ? __('filament-dependency-graph::graph.table.yes') : __('filament-dependency-graph::graph.table.no'));
-    $statusColor = fn (string $status): string => match ($status) {
-        'complete' => 'success',
-        'partial' => 'warning',
-        'failed' => 'danger',
-        default => 'gray',
-    };
+    $datasets = $this->getTableDatasetOptions();
 @endphp
 
-<div class="fdg-tables">
-    <x-filament::section compact class="fdg-table-section">
-        <x-slot name="heading">{{ $t('models') }}</x-slot>
+<div class="fdg-table-browser">
+    <div class="fdg-table-switcher">
+        <x-filament::tabs :label="__('filament-dependency-graph::graph.table.dataset_label')">
+            @foreach ($datasets as $dataset => $option)
+                <x-filament::tabs.item
+                    :active="$this->tableDataset === $dataset"
+                    :badge="$option['count']"
+                    :icon="$option['icon']"
+                    wire:click="setTableDataset('{{ $dataset }}')"
+                >
+                    {{ $option['label'] }}
+                </x-filament::tabs.item>
+            @endforeach
+        </x-filament::tabs>
+    </div>
 
-        <div class="fdg-table-scroll">
-            <table class="fdg-table">
-                <thead>
-                    <tr>
-                        <th><button type="button" wire:click="sortTableBy('label')">{{ $t('model') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('namespace')">{{ $t('namespace') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('table')">{{ $t('database_table') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('resources')">{{ $t('resources_count') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('outgoing')">{{ $t('outgoing') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('incoming')">{{ $t('incoming') }}</button></th>
-                        <th>{{ $t('soft_deletes') }}</th>
-                        <th>{{ $t('status') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($tables['models'] as $row)
-                        <tr wire:click="selectNode('{{ $row['id'] }}')" class="fdg-table-row">
-                            <td>{{ $row['label'] }}</td>
-                            <td>{{ $row['namespace'] }}</td>
-                            <td>{{ $row['table'] }}</td>
-                            <td>{{ $row['resources'] }}</td>
-                            <td>{{ $row['outgoing'] }}</td>
-                            <td>{{ $row['incoming'] }}</td>
-                            <td>{{ $bool($row['soft_deletes']) }}</td>
-                            <td>
-                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
-                                    {{ $row['status'] }}
-                                </x-filament::badge>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </x-filament::section>
-
-    <x-filament::section compact class="fdg-table-section">
-        <x-slot name="heading">{{ $t('relations') }}</x-slot>
-
-        <div class="fdg-table-scroll">
-            <table class="fdg-table">
-                <thead>
-                    <tr>
-                        <th><button type="button" wire:click="sortTableBy('label')">{{ $t('source') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('method')">{{ $t('method') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('type')">{{ $t('type') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('target')">{{ $t('target') }}</button></th>
-                        <th>{{ $t('foreign_key') }}</th>
-                        <th>{{ $t('pivot') }}</th>
-                        <th>{{ $t('nullable') }}</th>
-                        <th>{{ $t('status') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($tables['relations'] as $row)
-                        <tr wire:click="selectEdge('{{ $row['id'] }}')" class="fdg-table-row">
-                            <td>{{ $row['label'] }}</td>
-                            <td>{{ $row['method'] }}</td>
-                            <td>{{ $row['type'] }}</td>
-                            <td>{{ $row['target'] }}</td>
-                            <td>{{ $row['foreign_key'] ?? '-' }}</td>
-                            <td>{{ $row['pivot'] ?? '-' }}</td>
-                            <td>{{ $bool($row['nullable']) }}</td>
-                            <td>
-                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
-                                    {{ $row['status'] }}
-                                </x-filament::badge>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </x-filament::section>
-
-    <x-filament::section compact class="fdg-table-section">
-        <x-slot name="heading">{{ $t('resources') }}</x-slot>
-
-        <div class="fdg-table-scroll">
-            <table class="fdg-table">
-                <thead>
-                    <tr>
-                        <th><button type="button" wire:click="sortTableBy('label')">{{ $t('resource') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('model')">{{ $t('model') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('panels')">{{ $t('panels') }}</button></th>
-                        <th><button type="button" wire:click="sortTableBy('navigation_group')">{{ $t('navigation_group') }}</button></th>
-                        <th>{{ $t('pages') }}</th>
-                        <th>{{ $t('relation_managers') }}</th>
-                        <th>{{ $t('status') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($tables['resources'] as $row)
-                        <tr wire:click="selectNode('{{ $row['id'] }}')" class="fdg-table-row">
-                            <td>{{ $row['label'] }}</td>
-                            <td>{{ $row['model'] }}</td>
-                            <td>{{ $row['panels'] }}</td>
-                            <td>{{ $row['navigation_group'] ?? '-' }}</td>
-                            <td>{{ $row['pages'] }}</td>
-                            <td>{{ $row['relation_managers'] }}</td>
-                            <td>
-                                <x-filament::badge :color="$statusColor($row['status'])" size="sm">
-                                    {{ $row['status'] }}
-                                </x-filament::badge>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </x-filament::section>
+    <div class="fdg-native-table">
+        {{ $this->table }}
+    </div>
 </div>
