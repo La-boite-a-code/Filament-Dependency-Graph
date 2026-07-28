@@ -8,6 +8,7 @@ enum NodeType: string
 {
     case Panel = 'panel';
     case Resource = 'resource';
+    case LivewireComponent = 'livewire_component';
     case Model = 'model';
     case PolymorphicTarget = 'polymorphic_target';
 
@@ -19,8 +20,9 @@ enum NodeType: string
         return match ($this) {
             self::Panel => 0,
             self::Resource => 1,
-            self::Model => 2,
-            self::PolymorphicTarget => 3,
+            self::LivewireComponent => 2,
+            self::Model => 3,
+            self::PolymorphicTarget => 4,
         };
     }
 }

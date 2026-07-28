@@ -8,9 +8,18 @@ use BackedEnum;
 use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
 use Filament\Panel;
+use Filament\Support\Enums\FontFamily;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\Width;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use LaBoiteACode\DependencyGraph\Application\SearchDependencyGraph;
 use LaBoiteACode\DependencyGraph\Contracts\DependencyGraphManager;
 use LaBoiteACode\DependencyGraph\DependencyGraphPlugin;
@@ -31,8 +40,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use UnitEnum;
 
-class DependencyGraphPage extends Page
+class DependencyGraphPage extends Page implements HasTable
 {
+    use InteractsWithTable;
+
+    private const INSPECTOR_MODAL_ID = 'fdg-inspector';
+
+    private const TABLE_DATASETS = ['models', 'livewire_components', 'relations', 'resources'];
+
     protected string $view = 'filament-dependency-graph::page';
 
     protected static ?string $slug = 'dependency-graph';
@@ -82,9 +97,8 @@ class DependencyGraphPage extends Page
 
     public string $graphLayout = 'hierarchical';
 
-    public string $tableSort = 'label';
-
-    public bool $tableSortDesc = false;
+    #[Url(as: 'dataset')]
+    public string $tableDataset = 'models';
 
     protected ?Graph $memoizedGraph = null;
 
@@ -244,6 +258,12 @@ class DependencyGraphPage extends Page
 
         $this->showOrphans = (bool) $config->get('filament-dependency-graph.graph.show_orphans', true);
         $this->graphLayout = (string) $config->get('filament-dependency-graph.graph.default_layout', 'hierarchical');
+        $this->activeView = in_array($this->activeView, ['graph', 'tree', 'table'], true)
+            ? $this->activeView
+            : 'graph';
+        $this->tableDataset = in_array($this->tableDataset, self::TABLE_DATASETS, true)
+            ? $this->tableDataset
+            : 'models';
 
         if (! $config->get('filament-dependency-graph.graph.show_panel_nodes', true)) {
             $this->hiddenNodeTypes[] = NodeType::Panel->value;
@@ -258,24 +278,33 @@ class DependencyGraphPage extends Page
     {
         $this->selectedNodeId = $nodeId;
         $this->selectedEdgeId = null;
+
+        $this->dispatch('open-modal', id: self::INSPECTOR_MODAL_ID);
     }
 
     public function selectEdge(string $edgeId): void
     {
         $this->selectedEdgeId = $edgeId;
         $this->selectedNodeId = null;
+
+        $this->dispatch('open-modal', id: self::INSPECTOR_MODAL_ID);
     }
 
     public function clearSelection(): void
     {
         if ($this->selectedNodeId === null && $this->selectedEdgeId === null && $this->focus !== null) {
             $this->focus = null;
+            $this->dispatch('close-modal', id: self::INSPECTOR_MODAL_ID);
+            $this->dispatch('dependency-graph-clear-selection');
 
             return;
         }
 
         $this->selectedNodeId = null;
         $this->selectedEdgeId = null;
+
+        $this->dispatch('close-modal', id: self::INSPECTOR_MODAL_ID);
+        $this->dispatch('dependency-graph-clear-selection');
     }
 
     public function focusOnNode(?string $nodeId = null): void
@@ -303,6 +332,19 @@ class DependencyGraphPage extends Page
         if (in_array($view, ['graph', 'tree', 'table'], true)) {
             $this->activeView = $view;
         }
+    }
+
+    public function setTableDataset(string $dataset): void
+    {
+        if (! in_array($dataset, self::TABLE_DATASETS, true)) {
+            return;
+        }
+
+        $this->tableDataset = $dataset;
+        $this->tableSearch = '';
+        $this->tableSort = null;
+
+        $this->resetTable();
     }
 
     public function toggleNodeType(string $type): void
@@ -345,6 +387,9 @@ class DependencyGraphPage extends Page
         $this->onlyOrphans = false;
         $this->onlyCycles = false;
         $this->onlyWithoutResource = false;
+        $this->tableDataset = 'models';
+        $this->tableSearch = '';
+        $this->tableSort = null;
 
         $config = $this->configRepository();
 
@@ -355,6 +400,9 @@ class DependencyGraphPage extends Page
         $this->graphLayout = (string) $config->get('filament-dependency-graph.graph.default_layout', 'hierarchical');
 
         $this->forgetMemoizedGraphs();
+        $this->resetTable();
+        $this->dispatch('close-modal', id: self::INSPECTOR_MODAL_ID);
+        $this->dispatch('dependency-graph-clear-selection');
     }
 
     /**
@@ -496,6 +544,10 @@ class DependencyGraphPage extends Page
                 $roots[] = $panel->id->value;
             }
 
+            foreach ($graph->nodesOfType(NodeType::LivewireComponent) as $component) {
+                $roots[] = $component->id->value;
+            }
+
             if ($roots === []) {
                 foreach ($graph->nodesOfType(NodeType::Model) as $model) {
                     if ($graph->incomingEdges($model->id) === []) {
@@ -524,15 +576,291 @@ class DependencyGraphPage extends Page
         return array_values(array_filter($tree));
     }
 
+    public function table(Table $table): Table
+    {
+        return $table
+            ->records(
+                fn (
+                    ?string $search,
+                    ?string $sortColumn,
+                    ?string $sortDirection,
+                    int $page,
+                    int $recordsPerPage,
+                ): LengthAwarePaginator => $this->getDatasetTableRecords(
+                    search: $search,
+                    sortColumn: $sortColumn,
+                    sortDirection: $sortDirection,
+                    page: $page,
+                    recordsPerPage: $recordsPerPage,
+                ),
+            )
+            ->columns($this->getDatasetTableColumns())
+            ->heading(__('filament-dependency-graph::graph.table.' . $this->tableDataset))
+            ->description(fn (): string => __('filament-dependency-graph::graph.table.items', [
+                'count' => count($this->getTables()[$this->tableDataset] ?? []),
+            ]))
+            ->searchable()
+            ->searchDebounce('300ms')
+            ->searchPlaceholder(__('filament-dependency-graph::graph.table.search_placeholder'))
+            ->paginated([10, 25, 50])
+            ->defaultPaginationPageOption(25)
+            ->recordAction(fn (): string => $this->tableDataset === 'relations' ? 'selectEdge' : 'selectNode')
+            ->recordClasses('fdg-native-table-record')
+            ->emptyStateHeading(__('filament-dependency-graph::graph.table.empty'))
+            ->emptyStateIcon('heroicon-o-circle-stack')
+            ->columnManagerColumns(2);
+    }
+
     /**
-     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>}
+     * @return array<string, array{label: string, icon: string, count: int}>
+     */
+    public function getTableDatasetOptions(): array
+    {
+        $tables = $this->getTables();
+
+        return [
+            'models' => [
+                'label' => __('filament-dependency-graph::graph.table.models'),
+                'icon' => 'heroicon-m-circle-stack',
+                'count' => count($tables['models']),
+            ],
+            'livewire_components' => [
+                'label' => __('filament-dependency-graph::graph.table.livewire_components'),
+                'icon' => 'heroicon-m-bolt',
+                'count' => count($tables['livewire_components']),
+            ],
+            'relations' => [
+                'label' => __('filament-dependency-graph::graph.table.relations'),
+                'icon' => 'heroicon-m-arrows-right-left',
+                'count' => count($tables['relations']),
+            ],
+            'resources' => [
+                'label' => __('filament-dependency-graph::graph.table.resources'),
+                'icon' => 'heroicon-m-rectangle-stack',
+                'count' => count($tables['resources']),
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, IconColumn|TextColumn>
+     */
+    protected function getDatasetTableColumns(): array
+    {
+        return match ($this->tableDataset) {
+            'livewire_components' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.component'))
+                    ->description(fn (array $record): string => (string) ($record['alias'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('view')
+                    ->label(__('filament-dependency-graph::graph.table.view'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('models')
+                    ->label(__('filament-dependency-graph::graph.table.models_count'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('properties')
+                    ->label(__('filament-dependency-graph::graph.table.properties'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('methods')
+                    ->label(__('filament-dependency-graph::graph.table.methods_count'))
+                    ->numeric()
+                    ->sortable(),
+                $this->statusTableColumn(),
+            ],
+            'relations' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.source'))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('method')
+                    ->label(__('filament-dependency-graph::graph.table.method'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->color('primary')
+                    ->sortable(),
+                TextColumn::make('type')
+                    ->label(__('filament-dependency-graph::graph.table.type'))
+                    ->badge()
+                    ->color('gray')
+                    ->sortable(),
+                TextColumn::make('target')
+                    ->label(__('filament-dependency-graph::graph.table.target'))
+                    ->weight(FontWeight::Medium)
+                    ->sortable(),
+                TextColumn::make('foreign_key')
+                    ->label(__('filament-dependency-graph::graph.table.foreign_key'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('pivot')
+                    ->label(__('filament-dependency-graph::graph.table.pivot'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('nullable')
+                    ->label(__('filament-dependency-graph::graph.table.nullable'))
+                    ->badge()
+                    ->state(fn (array $record): string => $this->formatTableBoolean(
+                        is_bool($record['nullable'] ?? null) ? $record['nullable'] : null,
+                    ))
+                    ->color(fn (array $record): string => match ($record['nullable'] ?? null) {
+                        true => 'success',
+                        false => 'gray',
+                        default => 'warning',
+                    }),
+                $this->statusTableColumn(),
+            ],
+            'resources' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.resource'))
+                    ->description(fn (array $record): string => (string) ($record['model'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('panels')
+                    ->label(__('filament-dependency-graph::graph.table.panels'))
+                    ->badge()
+                    ->color('primary')
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('navigation_group')
+                    ->label(__('filament-dependency-graph::graph.table.navigation_group'))
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('pages')
+                    ->label(__('filament-dependency-graph::graph.table.pages'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('relation_managers')
+                    ->label(__('filament-dependency-graph::graph.table.relation_managers'))
+                    ->numeric()
+                    ->sortable(),
+                $this->statusTableColumn(),
+            ],
+            default => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.model'))
+                    ->description(fn (array $record): string => (string) ($record['namespace'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('table')
+                    ->label(__('filament-dependency-graph::graph.table.database_table'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('resources')
+                    ->label(__('filament-dependency-graph::graph.table.resources_count'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('livewire_components')
+                    ->label(__('filament-dependency-graph::graph.table.livewire_components_count'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('outgoing')
+                    ->label(__('filament-dependency-graph::graph.table.outgoing'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('incoming')
+                    ->label(__('filament-dependency-graph::graph.table.incoming'))
+                    ->numeric()
+                    ->sortable(),
+                IconColumn::make('soft_deletes')
+                    ->label(__('filament-dependency-graph::graph.table.soft_deletes'))
+                    ->boolean(),
+                $this->statusTableColumn(),
+            ],
+        };
+    }
+
+    protected function statusTableColumn(): TextColumn
+    {
+        return TextColumn::make('status')
+            ->label(__('filament-dependency-graph::graph.table.status'))
+            ->badge()
+            ->formatStateUsing(fn (string $state): string => __(
+                'filament-dependency-graph::graph.table.statuses.' . $state,
+            ))
+            ->color(fn (string $state): string => match ($state) {
+                'complete' => 'success',
+                'partial' => 'warning',
+                'failed' => 'danger',
+                default => 'gray',
+            });
+    }
+
+    protected function formatTableBoolean(?bool $value): string
+    {
+        return match ($value) {
+            true => __('filament-dependency-graph::graph.table.yes'),
+            false => __('filament-dependency-graph::graph.table.no'),
+            null => __('filament-dependency-graph::graph.table.unknown'),
+        };
+    }
+
+    /**
+     * @return LengthAwarePaginator<string, array<string, mixed>>
+     */
+    protected function getDatasetTableRecords(
+        ?string $search,
+        ?string $sortColumn,
+        ?string $sortDirection,
+        int $page,
+        int $recordsPerPage,
+    ): LengthAwarePaginator {
+        /** @var Collection<int, array<string, mixed>> $rows */
+        $rows = collect($this->getTables()[$this->tableDataset] ?? []);
+
+        if (filled($search)) {
+            $normalizedSearch = SearchNormalizer::normalize((string) $search);
+
+            $rows = $rows->filter(
+                static fn (array $row): bool => collect($row)
+                    ->filter(static fn (mixed $value): bool => is_scalar($value))
+                    ->contains(
+                        static fn (mixed $value): bool => str_contains(
+                            SearchNormalizer::normalize((string) $value),
+                            $normalizedSearch,
+                        ),
+                    ),
+            );
+        }
+
+        $sortColumn ??= 'label';
+        $sortDirection ??= 'asc';
+
+        $rows = $rows->sortBy(
+            static fn (array $row): string => SearchNormalizer::normalize((string) ($row[$sortColumn] ?? '')),
+            SORT_NATURAL,
+            $sortDirection === 'desc',
+        );
+
+        $total = $rows->count();
+        $records = $rows
+            ->forPage($page, $recordsPerPage)
+            ->keyBy(static fn (array $row): string => (string) $row['id']);
+
+        return new LengthAwarePaginator(
+            items: $records,
+            total: $total,
+            perPage: $recordsPerPage,
+            currentPage: $page,
+            options: ['pageName' => $this->getTablePaginationPageName()],
+        );
+    }
+
+    /**
+     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, livewire_components: list<array<string, mixed>>}
      */
     public function getTables(): array
     {
         try {
             $graph = $this->currentGraph();
         } catch (Throwable) {
-            return ['models' => [], 'relations' => [], 'resources' => []];
+            return ['models' => [], 'relations' => [], 'resources' => [], 'livewire_components' => []];
         }
 
         $models = [];
@@ -541,6 +869,7 @@ class DependencyGraphPage extends Page
             $outgoing = 0;
             $incoming = 0;
             $resourceCount = 0;
+            $livewireComponentCount = 0;
 
             foreach ($graph->outgoingEdges($node->id) as $edge) {
                 if ($edge->type === EdgeType::ModelRelation) {
@@ -556,6 +885,10 @@ class DependencyGraphPage extends Page
                 if ($edge->type === EdgeType::ResourceUsesModel) {
                     $resourceCount++;
                 }
+
+                if ($edge->type === EdgeType::LivewireUsesModel) {
+                    $livewireComponentCount++;
+                }
             }
 
             $models[] = [
@@ -564,6 +897,7 @@ class DependencyGraphPage extends Page
                 'namespace' => $node->metadata['namespace'] ?? '',
                 'table' => $node->metadata['table'] ?? '',
                 'resources' => $resourceCount,
+                'livewire_components' => $livewireComponentCount,
                 'outgoing' => $outgoing,
                 'incoming' => $incoming,
                 'soft_deletes' => ($node->metadata['soft_deletes'] ?? false) === true,
@@ -606,23 +940,31 @@ class DependencyGraphPage extends Page
             ];
         }
 
+        $livewireComponents = [];
+
+        foreach ($graph->nodesOfType(NodeType::LivewireComponent) as $node) {
+            $properties = $node->metadata['public_properties'] ?? [];
+            $methods = $node->metadata['public_methods'] ?? [];
+            $modelIds = $node->metadata['model_ids'] ?? [];
+
+            $livewireComponents[] = [
+                'id' => $node->id->value,
+                'label' => $node->label,
+                'alias' => $node->metadata['alias'] ?? '',
+                'view' => $node->metadata['view'] ?? null,
+                'models' => is_array($modelIds) ? count($modelIds) : 0,
+                'properties' => is_array($properties) ? count($properties) : 0,
+                'methods' => is_array($methods) ? count($methods) : 0,
+                'status' => $node->status->value,
+            ];
+        }
+
         return [
             'models' => $this->sortRows($models),
             'relations' => $this->sortRows($relations),
             'resources' => $this->sortRows($resources),
+            'livewire_components' => $this->sortRows($livewireComponents),
         ];
-    }
-
-    public function sortTableBy(string $column): void
-    {
-        if ($this->tableSort === $column) {
-            $this->tableSortDesc = ! $this->tableSortDesc;
-
-            return;
-        }
-
-        $this->tableSort = $column;
-        $this->tableSortDesc = false;
     }
 
     /**
@@ -870,17 +1212,16 @@ class DependencyGraphPage extends Page
      */
     protected function sortRows(array $rows): array
     {
-        $column = $this->tableSort;
-        $descending = $this->tableSortDesc;
-
-        usort($rows, static function (array $a, array $b) use ($column, $descending): int {
-            $left = $a[$column] ?? $a['label'] ?? '';
-            $right = $b[$column] ?? $b['label'] ?? '';
-
-            $result = $left <=> $right;
-
-            return $descending ? -$result : $result;
-        });
+        usort(
+            $rows,
+            static fn (array $a, array $b): int => [
+                SearchNormalizer::normalize((string) ($a['label'] ?? '')),
+                (string) ($a['id'] ?? ''),
+            ] <=> [
+                SearchNormalizer::normalize((string) ($b['label'] ?? '')),
+                (string) ($b['id'] ?? ''),
+            ],
+        );
 
         return $rows;
     }

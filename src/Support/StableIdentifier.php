@@ -24,6 +24,11 @@ final class StableIdentifier
         return 'resource:' . self::normalizeClass($class);
     }
 
+    public static function livewireComponent(string $class): string
+    {
+        return 'livewire:' . self::normalizeClass($class);
+    }
+
     public static function panel(string $panelId): string
     {
         return 'panel:' . self::normalizeSegment($panelId);

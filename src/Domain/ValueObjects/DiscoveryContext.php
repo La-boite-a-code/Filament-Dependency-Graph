@@ -22,6 +22,8 @@ final readonly class DiscoveryContext
      * @param  list<string>  $excludedTables
      * @param  list<string>  $excludedRelations  Entries formatted as "Fully\Qualified\Model::method".
      * @param  list<string>  $vendorModelNamespaces
+     * @param  list<string>  $livewirePaths
+     * @param  list<string>  $livewireNamespaces
      * @param  list<string>  $panelIds  Empty list means every registered panel.
      */
     public function __construct(
@@ -38,6 +40,9 @@ final readonly class DiscoveryContext
         public bool $inspectDatabaseSchema = true,
         public bool $useDocblocks = true,
         public bool $useHeuristicInvocation = false,
+        public bool $discoverLivewireComponents = true,
+        public array $livewirePaths = [],
+        public array $livewireNamespaces = [],
         public array $panelIds = [],
         public string $basePath = '',
         public string $vendorPath = '',
@@ -82,6 +87,9 @@ final readonly class DiscoveryContext
             'inspect_database_schema' => $this->inspectDatabaseSchema,
             'use_docblocks' => $this->useDocblocks,
             'use_heuristic_invocation' => $this->useHeuristicInvocation,
+            'discover_livewire_components' => $this->discoverLivewireComponents,
+            'livewire_paths' => $this->livewirePaths,
+            'livewire_namespaces' => $this->livewireNamespaces,
             'panel_ids' => $this->panelIds,
             'base_path' => $this->basePath,
             'vendor_path' => $this->vendorPath,
@@ -110,6 +118,9 @@ final readonly class DiscoveryContext
             inspectDatabaseSchema: $inspectDatabaseSchema ?? $this->inspectDatabaseSchema,
             useDocblocks: $this->useDocblocks,
             useHeuristicInvocation: $this->useHeuristicInvocation,
+            discoverLivewireComponents: $this->discoverLivewireComponents,
+            livewirePaths: $this->livewirePaths,
+            livewireNamespaces: $this->livewireNamespaces,
             panelIds: $panelIds ?? $this->panelIds,
             basePath: $this->basePath,
             vendorPath: $this->vendorPath,

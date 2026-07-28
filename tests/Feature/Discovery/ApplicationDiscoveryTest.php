@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
+use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationData;
@@ -16,7 +17,8 @@ it('discovers a complete application snapshot from the fixture domain', function
         ->and(count($snapshot->models))->toBeGreaterThanOrEqual(13)
         ->and(count($snapshot->relations))->toBeGreaterThanOrEqual(20)
         ->and(count($snapshot->resources))->toBe(5)
-        ->and(count($snapshot->panels))->toBe(3);
+        ->and(count($snapshot->panels))->toBe(3)
+        ->and(count($snapshot->livewireComponents))->toBe(2);
 });
 
 it('produces deterministic output across two discovery runs', function (): void {
@@ -37,6 +39,10 @@ it('sorts snapshot collections deterministically', function (): void {
     $relationIds = array_map(fn (RelationData $relation): string => $relation->id, $snapshot->relations);
     $resourceIds = array_map(fn (ResourceData $resource): string => $resource->id, $snapshot->resources);
     $panelIds = array_map(fn (PanelData $panel): string => $panel->id, $snapshot->panels);
+    $livewireComponentIds = array_map(
+        fn (LivewireComponentData $component): string => $component->id,
+        $snapshot->livewireComponents,
+    );
 
     $sorted = static function (array $values): array {
         $copy = $values;
@@ -48,7 +54,8 @@ it('sorts snapshot collections deterministically', function (): void {
     expect($modelIds)->toBe($sorted($modelIds))
         ->and($relationIds)->toBe($sorted($relationIds))
         ->and($resourceIds)->toBe($sorted($resourceIds))
-        ->and($panelIds)->toBe($sorted($panelIds));
+        ->and($panelIds)->toBe($sorted($panelIds))
+        ->and($livewireComponentIds)->toBe($sorted($livewireComponentIds));
 });
 
 it('aggregates discovery warnings from partial models and relations', function (): void {

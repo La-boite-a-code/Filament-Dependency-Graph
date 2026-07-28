@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Graph;
 
+use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PageData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
@@ -104,6 +105,48 @@ final class NodeFactory
             ],
             badges: $badges,
             status: $model->status,
+        );
+    }
+
+    public function forLivewireComponent(LivewireComponentData $component): Node
+    {
+        $badges = [];
+
+        if ($component->view !== null) {
+            $badges[] = 'View';
+        }
+
+        if ($component->modelReferences !== []) {
+            $badges[] = sprintf(
+                '%d %s',
+                count($component->modelReferences),
+                count($component->modelReferences) === 1 ? 'model' : 'models',
+            );
+        }
+
+        if ($component->status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return new Node(
+            id: NodeId::fromString($component->id),
+            type: NodeType::LivewireComponent,
+            label: $component->shortName,
+            subtitle: $component->alias,
+            metadata: [
+                'class' => $component->class,
+                'namespace' => $component->namespace,
+                'alias' => $component->alias,
+                'view' => $component->view,
+                'file' => $component->file,
+                'public_properties' => $component->publicProperties,
+                'public_methods' => $component->publicMethods,
+                'model_ids' => $component->modelIds(),
+                'model_references' => $component->modelReferences,
+                'warnings' => $component->warnings,
+            ],
+            badges: $badges,
+            status: $component->status,
         );
     }
 

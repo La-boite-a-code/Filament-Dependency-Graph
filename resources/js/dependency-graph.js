@@ -7,10 +7,11 @@ cytoscape.use(fcose)
 
 const labelMetrics = (() => {
     const context = document.createElement('canvas').getContext('2d')
+    const fontFamily = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
     return (node) => {
         const label = String(node.data('label') ?? '')
-        context.font = `${node.data('type') === 'panel' ? 'bold ' : ''}11px Helvetica, Arial, sans-serif`
+        context.font = `${node.data('type') === 'panel' ? '600 ' : ''}12px ${fontFamily}`
 
         return Math.max(...label.split('\n').map((line) => context.measureText(line).width), 24)
     }
@@ -20,7 +21,7 @@ const labelMetrics = (() => {
 // deprecated label sizing needs the renderer to have measured every label,
 // which silently fails while the lazily mounted container has no dimensions
 // and leaves nodes invisible.
-const nodeWidth = (node) => Math.min(Math.ceil(labelMetrics(node)) + 8, 180)
+const nodeWidth = (node) => Math.min(Math.ceil(labelMetrics(node)) + 14, 200)
 
 // Normalizes any CSS color to rgb() by painting one pixel and reading it
 // back: Filament ships its theme scales as oklch(), which browsers pass
@@ -57,6 +58,10 @@ export default function dependencyGraph({ graph, selected, layout }) {
 
         centerListener: null,
 
+        fitListener: null,
+
+        clearSelectionListener: null,
+
         needsFit: false,
 
         init() {
@@ -72,16 +77,21 @@ export default function dependencyGraph({ graph, selected, layout }) {
 
             window.addEventListener('dependency-graph-center', this.centerListener)
 
+            this.fitListener = () => this.fit()
+            window.addEventListener('dependency-graph-fit', this.fitListener)
+
+            this.clearSelectionListener = () => this.clearSelection()
+            window.addEventListener('dependency-graph-clear-selection', this.clearSelectionListener)
+
             this.themeObserver = new MutationObserver(() => this.applyStyles())
             this.themeObserver.observe(document.documentElement, {
                 attributes: true,
                 attributeFilter: ['class'],
             })
 
-            // The canvas resizes when the inspector opens or closes; without
-            // this, Cytoscape keeps stale dimensions and hit-testing drifts.
-            // It also finishes the initial fit when the component mounted
-            // inside a container that had no dimensions yet.
+            // Keep Cytoscape's hit-testing aligned with responsive and expanded
+            // layout changes. This also finishes the initial fit when the
+            // component mounted inside a container with no dimensions yet.
             this.resizeObserver = new ResizeObserver(() => {
                 this.cy?.resize()
 
@@ -94,6 +104,8 @@ export default function dependencyGraph({ graph, selected, layout }) {
 
         destroy() {
             window.removeEventListener('dependency-graph-center', this.centerListener)
+            window.removeEventListener('dependency-graph-fit', this.fitListener)
+            window.removeEventListener('dependency-graph-clear-selection', this.clearSelectionListener)
             this.themeObserver?.disconnect()
             this.resizeObserver?.disconnect()
             this.cy?.destroy()
@@ -120,14 +132,16 @@ export default function dependencyGraph({ graph, selected, layout }) {
                 ? {
                       text: themeColor('--gray-200', '#e5e7eb'),
                       subtitle: themeColor('--gray-400', '#9ca3af'),
-                      edge: themeColor('--gray-600', '#4b5563'),
+                      edge: themeColor('--gray-500', '#6b7280'),
                       edgeLabel: themeColor('--gray-400', '#9ca3af'),
                       labelBackground: themeColor('--gray-800', '#1f2937'),
-                      structuralEdge: themeColor('--gray-700', '#374151'),
+                      structuralEdge: themeColor('--gray-600', '#4b5563'),
                       panel: themeColor('--primary-950', '#312e81'),
                       panelBorder: themeColor('--primary-500', '#6366f1'),
                       resource: themeColor('--success-950', '#134e4a'),
                       resourceBorder: themeColor('--success-500', '#14b8a6'),
+                      livewire: themeColor('--info-950', '#172554'),
+                      livewireBorder: themeColor('--info-500', '#3b82f6'),
                       model: themeColor('--gray-800', '#1f2937'),
                       modelBorder: themeColor('--gray-500', '#6b7280'),
                       polymorphic: themeColor('--info-950', '#4a044e'),
@@ -137,15 +151,17 @@ export default function dependencyGraph({ graph, selected, layout }) {
                 : {
                       text: themeColor('--gray-950', '#111827'),
                       subtitle: themeColor('--gray-500', '#6b7280'),
-                      edge: themeColor('--gray-400', '#9ca3af'),
+                      edge: themeColor('--gray-500', '#6b7280'),
                       edgeLabel: themeColor('--gray-500', '#6b7280'),
                       labelBackground: themeColor('--gray-50', '#f9fafb'),
-                      structuralEdge: themeColor('--gray-300', '#d1d5db'),
+                      structuralEdge: themeColor('--gray-400', '#9ca3af'),
                       panel: themeColor('--primary-100', '#e0e7ff'),
                       panelBorder: themeColor('--primary-500', '#6366f1'),
                       resource: themeColor('--success-100', '#ccfbf1'),
                       resourceBorder: themeColor('--success-600', '#0d9488'),
-                      model: themeColor('--gray-50', '#f9fafb'),
+                      livewire: themeColor('--info-100', '#dbeafe'),
+                      livewireBorder: themeColor('--info-600', '#2563eb'),
+                      model: themeColor('--color-white', '#ffffff'),
                       modelBorder: themeColor('--gray-400', '#9ca3af'),
                       polymorphic: themeColor('--info-100', '#fae8ff'),
                       polymorphicBorder: themeColor('--info-600', '#c026d3'),
@@ -163,15 +179,17 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         label: 'data(label)',
                         'text-valign': 'center',
                         'text-halign': 'center',
-                        'font-size': '11px',
-                        'min-zoomed-font-size': 5,
+                        'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        'font-size': '12px',
+                        'font-weight': 500,
+                        'min-zoomed-font-size': 6,
                         color: colors.text,
                         width: nodeWidth,
-                        height: '36px',
-                        padding: '12px',
+                        height: '38px',
+                        padding: '13px',
                         shape: 'round-rectangle',
                         'background-color': colors.model,
-                        'border-width': 1.5,
+                        'border-width': 1.75,
                         'border-color': colors.modelBorder,
                         'text-wrap': 'wrap',
                         'text-max-width': '160px',
@@ -184,7 +202,7 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         padding: '16px',
                         'background-color': colors.panel,
                         'border-color': colors.panelBorder,
-                        'font-weight': 'bold',
+                        'font-weight': 650,
                     },
                 },
                 {
@@ -194,6 +212,16 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         padding: '16px',
                         'background-color': colors.resource,
                         'border-color': colors.resourceBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "livewire_component"]',
+                    style: {
+                        shape: 'round-rectangle',
+                        padding: '16px',
+                        'background-color': colors.livewire,
+                        'border-color': colors.livewireBorder,
+                        'border-width': 2,
                     },
                 },
                 {
@@ -209,12 +237,12 @@ export default function dependencyGraph({ graph, selected, layout }) {
                 {
                     selector: 'edge',
                     style: {
-                        width: 1.5,
+                        width: 1.75,
                         'line-color': colors.edge,
                         'target-arrow-color': colors.edge,
                         'target-arrow-shape': 'triangle',
                         'curve-style': 'bezier',
-                        'arrow-scale': 0.8,
+                        'arrow-scale': 0.9,
                     },
                 },
                 {
@@ -229,15 +257,17 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     selector: 'edge[type = "model_relation"]',
                     style: {
                         label: 'data(label)',
-                        'font-size': '9px',
+                        'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        'font-size': '10px',
+                        'font-weight': 500,
                         // Hide edge labels while zoomed out: at overview scale
                         // they are unreadable and only add visual noise.
                         'min-zoomed-font-size': 7,
                         color: colors.edgeLabel,
                         'text-rotation': 'autorotate',
                         'text-background-color': colors.labelBackground,
-                        'text-background-opacity': 0.85,
-                        'text-background-padding': '2px',
+                        'text-background-opacity': 0.94,
+                        'text-background-padding': '3px',
                         'text-background-shape': 'roundrectangle',
                         'text-margin-y': -6,
                     },
@@ -249,6 +279,9 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         'border-color': colors.selection,
                         'line-color': colors.selection,
                         'target-arrow-color': colors.selection,
+                        'underlay-color': colors.selection,
+                        'underlay-opacity': 0.16,
+                        'underlay-padding': 7,
                     },
                 },
                 {
@@ -268,9 +301,9 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     quality: 'proof',
                     animate: false,
                     randomize: true,
-                    padding: 30,
-                    nodeRepulsion: 8000,
-                    idealEdgeLength: 110,
+                    padding: 42,
+                    nodeRepulsion: 8800,
+                    idealEdgeLength: 120,
                     packComponents: true,
                 }
             }
@@ -279,10 +312,10 @@ export default function dependencyGraph({ graph, selected, layout }) {
                 name: 'dagre',
                 rankDir: 'TB',
                 ranker: 'network-simplex',
-                nodeSep: 28,
-                edgeSep: 16,
-                rankSep: 80,
-                padding: 30,
+                nodeSep: 32,
+                edgeSep: 18,
+                rankSep: 88,
+                padding: 42,
             }
         },
 
@@ -336,7 +369,7 @@ export default function dependencyGraph({ graph, selected, layout }) {
 
             this.cy.on('tap', (event) => {
                 if (event.target === this.cy) {
-                    this.cy.elements().removeClass('fdg-selected fdg-faded')
+                    this.clearSelection()
                     this.$wire.clearSelection()
                 }
             })
@@ -367,6 +400,10 @@ export default function dependencyGraph({ graph, selected, layout }) {
             this.cy.elements().not(neighborhood).addClass('fdg-faded')
         },
 
+        clearSelection() {
+            this.cy?.elements().removeClass('fdg-selected fdg-faded')
+        },
+
         centerOn(nodeId) {
             const node = this.cy?.getElementById(nodeId)
 
@@ -376,13 +413,35 @@ export default function dependencyGraph({ graph, selected, layout }) {
             }
         },
 
+        zoomIn() {
+            this.zoomBy(1.2)
+        },
+
+        zoomOut() {
+            this.zoomBy(1 / 1.2)
+        },
+
+        zoomBy(factor) {
+            if (! this.cy) {
+                return
+            }
+
+            const center = {
+                x: this.cy.width() / 2,
+                y: this.cy.height() / 2,
+            }
+            const level = Math.min(this.cy.maxZoom(), Math.max(this.cy.minZoom(), this.cy.zoom() * factor))
+
+            this.cy.zoom({ level, renderedPosition: center })
+        },
+
         fit() {
             if (! this.cy || this.cy.width() === 0 || this.cy.height() === 0) {
                 return
             }
 
             this.needsFit = false
-            this.cy.fit(undefined, 40)
+            this.cy.fit(undefined, 56)
         },
 
         applyStyles() {

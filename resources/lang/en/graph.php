@@ -13,7 +13,7 @@ return [
         'view_graph' => 'Graph',
         'view_tree' => 'Tree',
         'view_table' => 'Table',
-        'search_placeholder' => 'Search models, resources, panels...',
+        'search_placeholder' => 'Search models, Livewire components, resources, panels...',
         'export' => 'Export',
         'export_json' => 'Export JSON',
         'export_mermaid' => 'Export Mermaid',
@@ -22,6 +22,7 @@ return [
 
     'explorer' => [
         'title' => 'Explorer',
+        'description' => 'Filter panels, node types and relations',
         'panels' => 'Panels',
         'node_types' => 'Node types',
         'relation_types' => 'Relation types',
@@ -48,11 +49,15 @@ return [
     'node_types' => [
         'panel' => 'Panels',
         'resource' => 'Resources',
+        'livewire_component' => 'Livewire components',
         'model' => 'Models',
         'polymorphic_target' => 'Polymorphic targets',
     ],
 
     'workspace' => [
+        'graph_title' => 'Dependency graph',
+        'tree_title' => 'Dependency tree',
+        'table_title' => 'Project inventory',
         'empty' => 'No nodes match the current filters.',
         'error' => 'The graph could not be built:',
         'stats' => ':nodes nodes, :edges edges',
@@ -60,13 +65,29 @@ return [
         'layout_hierarchical' => 'Hierarchical',
         'layout_force' => 'Force directed',
         'fit' => 'Fit to view',
+        'controls' => 'Graph controls',
+        'zoom_in' => 'Zoom in',
+        'zoom_out' => 'Zoom out',
+        'expand' => 'Expand graph',
+        'collapse' => 'Show explorer',
     ],
 
     'inspector' => [
         'title' => 'Inspector',
         'close' => 'Close inspector',
         'focus_node' => 'Focus this node',
+        'copy_value' => 'Copy value',
+        'copied' => 'Copied',
         'empty_section' => 'Nothing to display.',
+        'no_warnings' => 'No warnings detected.',
+        'types' => [
+            'panel' => 'Filament panel',
+            'resource' => 'Filament resource',
+            'livewire_component' => 'Livewire component',
+            'model' => 'Eloquent model',
+            'polymorphic_target' => 'Polymorphic target',
+            'edge' => 'Dependency',
+        ],
     ],
 
     'search' => [
@@ -79,11 +100,16 @@ return [
     ],
 
     'table' => [
+        'dataset_label' => 'Inventory category',
+        'search_placeholder' => 'Search this category...',
+        'items' => ':count items',
+        'empty' => 'No items match the current filters.',
         'models' => 'Models',
         'model' => 'Model',
         'namespace' => 'Namespace',
         'database_table' => 'Table',
         'resources_count' => 'Resources',
+        'livewire_components_count' => 'Livewire',
         'outgoing' => 'Outgoing',
         'incoming' => 'Incoming',
         'soft_deletes' => 'SoftDeletes',
@@ -102,8 +128,20 @@ return [
         'navigation_group' => 'Navigation group',
         'pages' => 'Pages',
         'relation_managers' => 'Relation managers',
+        'livewire_components' => 'Livewire components',
+        'component' => 'Component',
+        'alias' => 'Alias',
+        'view' => 'View',
+        'models_count' => 'Models',
+        'properties' => 'Properties',
+        'methods_count' => 'Methods',
         'yes' => 'Yes',
         'no' => 'No',
         'unknown' => 'Unknown',
+        'statuses' => [
+            'complete' => 'Complete',
+            'partial' => 'Partial',
+            'failed' => 'Failed',
+        ],
     ],
 ];

@@ -4,6 +4,33 @@ All notable changes to `laboiteacode/filament-dependency-graph` are documented i
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.1.0] - 2026-07-28
+
+### Added
+
+- Discover application Livewire components outside Filament panels in the Laravel scope, including conventional aliases, rendered views, public APIs and model dependencies inferred without component instantiation.
+- Add Livewire component nodes, component-to-model edges, search/filter support, a dedicated inspector and a fourth table view.
+- Add configurable Livewire paths and namespaces, with fluent plugin registration methods.
+
+### Changed
+
+- Give the graph more usable space with an adaptive-height canvas, a native Filament slide-over inspector and an expandable canvas mode.
+- Align the workspace, explorer and graph controls with the cover design while continuing to derive every color from Filament theme variables.
+- Replace the handcrafted inventory tables with a native searchable, sortable and paginated Filament Table organized by category.
+- Add explicit zoom controls and improve node, edge and selection contrast.
+- Bump the deterministic serialization schema to `1.1` for Livewire component snapshot data.
+
+### Fixed
+
+- Use Filament's native copyable text behavior for inspector values, including its tooltip and confirmation feedback.
+
+### Security
+
+- Update esbuild to a release that fixes `GHSA-67mh-4wv8-2f99`.
+- Pin every GitHub Action to an immutable commit, restrict workflow token permissions and configure Dependabot for Composer, npm and GitHub Actions with a seven-day update cooldown.
+
 ## [1.0.0] - 2026-07-24
 
 First stable release.
@@ -26,3 +53,7 @@ First stable release.
 - Compatibility adapters for Filament 4.x and 5.x.
 - Local-only visibility by default with a configurable visibility callback.
 - English and French translations.
+
+[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/releases/tag/v1.0.0

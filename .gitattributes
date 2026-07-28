@@ -1,8 +1,11 @@
 * text=auto eol=lf
 
 /art export-ignore
+/bin export-ignore
 /.github export-ignore
 /docs export-ignore
+/resources/css export-ignore
+/resources/js export-ignore
 /tests export-ignore
 /.editorconfig export-ignore
 /.gitattributes export-ignore

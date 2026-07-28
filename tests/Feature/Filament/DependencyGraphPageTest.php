@@ -67,6 +67,20 @@ it('opens the inspector for a relation edge', function (): void {
         ->and(array_column($inspection['sections'], 'key'))->toContain('relation', 'keys');
 });
 
+it('opens the inspector for a standalone Livewire component', function (): void {
+    $page = makePage();
+    $page->scope = 'laravel';
+
+    $page->selectNode('livewire:la-boite-a-code.dependency-graph.tests.fixtures.livewire.order-dashboard');
+
+    $inspection = $page->getInspection();
+
+    expect($inspection)->not->toBeNull()
+        ->and($inspection['title'])->toBe('OrderDashboard')
+        ->and(array_column($inspection['sections'], 'key'))
+        ->toContain('identity', 'rendering', 'public_api', 'models');
+});
+
 it('returns grouped search results', function (): void {
     $page = makePage();
     $page->search = 'Order';
@@ -78,6 +92,16 @@ it('returns grouped search results', function (): void {
     $types = array_column($groups, 'type');
 
     expect($types)->toContain('model');
+});
+
+it('searches standalone Livewire components in the Laravel scope', function (): void {
+    $page = makePage();
+    $page->scope = 'laravel';
+    $page->search = 'order dashboard';
+
+    $types = array_column($page->getSearchResults(), 'type');
+
+    expect($types)->toContain('livewire_component');
 });
 
 it('resets every filter to defaults', function (): void {
@@ -112,7 +136,7 @@ it('builds a cycle safe tree', function (): void {
         ->and($tree[0]['label'])->toBe('User');
 });
 
-it('exposes table rows for models, relations and resources', function (): void {
+it('exposes table rows for models, relations, Livewire components and resources', function (): void {
     $page = makePage();
     $page->scope = 'laravel';
 
@@ -120,8 +144,16 @@ it('exposes table rows for models, relations and resources', function (): void {
 
     expect($tables['models'])->not->toBeEmpty()
         ->and($tables['relations'])->not->toBeEmpty()
+        ->and($tables['livewire_components'])->not->toBeEmpty()
         ->and($tables['resources'])->not->toBeEmpty()
-        ->and($tables['models'][0])->toHaveKeys(['label', 'table', 'outgoing', 'incoming', 'status']);
+        ->and($tables['models'][0])->toHaveKeys([
+            'label',
+            'table',
+            'livewire_components',
+            'outgoing',
+            'incoming',
+            'status',
+        ]);
 });
 
 it('streams exports as downloads', function (): void {

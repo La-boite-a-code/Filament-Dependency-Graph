@@ -48,6 +48,19 @@ final class EdgeInspector
             ]);
         }
 
+        if ($edge->type === EdgeType::LivewireUsesModel) {
+            $references = $edge->metadata['references'] ?? [];
+
+            $sections[] = new InspectionSection('livewire', 'Livewire dependency', [
+                'Component' => $this->string($edge, 'component_class'),
+                'Model' => $this->string($edge, 'model_class'),
+                'References' => array_values(array_filter(
+                    is_array($references) ? $references : [],
+                    'is_string',
+                )),
+            ]);
+        }
+
         $warnings = $edge->metadata['warnings'] ?? [];
 
         $sections[] = new InspectionSection('diagnostics', 'Diagnostics', [

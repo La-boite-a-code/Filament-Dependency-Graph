@@ -8,6 +8,6 @@
     "cytoscape": "^3.30.0",
     "cytoscape-dagre": "^4.0.0",
     "cytoscape-fcose": "^2.2.0",
-    "esbuild": "^0.24.0"
+    "esbuild": "^0.28.1"
   }
 }

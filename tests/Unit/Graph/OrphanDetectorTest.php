@@ -32,3 +32,17 @@ it('never reports non model nodes', function (): void {
 
     expect((new OrphanDetector)->detect($graph))->toBe([]);
 });
+
+it('does not report models used by Livewire components as orphans', function (): void {
+    $graph = fakeGraph(
+        [
+            fakeNode('livewire:orders', NodeType::LivewireComponent),
+            fakeNode('model:order'),
+        ],
+        [
+            fakeEdge('livewire:orders', 'model:order', EdgeType::LivewireUsesModel),
+        ],
+    );
+
+    expect((new OrphanDetector)->detect($graph))->toBe([]);
+});
