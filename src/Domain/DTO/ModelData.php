@@ -24,7 +24,7 @@ final readonly class ModelData
         public string $namespace,
         public string $table,
         public string $connection,
-        public string $primaryKey,
+        public ?string $primaryKey,
         public string $keyType,
         public bool $incrementing,
         public bool $timestamps,
@@ -45,7 +45,7 @@ final readonly class ModelData
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{id: string, class: string, short_name: string, namespace: string, table: string, connection: string, primary_key: string, key_type: string, incrementing: bool, timestamps: bool, soft_deletes: bool, traits: list<string>, casts: array<string, string>, fillable: list<string>, guarded: list<string>, hidden: list<string>, visible: list<string>, status: string, warnings: list<string>, application_owned: bool} $data */
+        /** @var array{id: string, class: string, short_name: string, namespace: string, table: string, connection: string, primary_key: string|null, key_type: string, incrementing: bool, timestamps: bool, soft_deletes: bool, traits: list<string>, casts: array<string, string>, fillable: list<string>, guarded: list<string>, hidden: list<string>, visible: list<string>, status: string, warnings: list<string>, application_owned: bool} $data */
         return new self(
             id: $data['id'],
             class: $data['class'],
@@ -53,7 +53,9 @@ final readonly class ModelData
             namespace: $data['namespace'],
             table: $data['table'],
             connection: $data['connection'],
-            primaryKey: $data['primary_key'],
+            primaryKey: is_string($data['primary_key']) && $data['primary_key'] !== ''
+                ? $data['primary_key']
+                : null,
             keyType: $data['key_type'],
             incrementing: $data['incrementing'],
             timestamps: $data['timestamps'],

@@ -112,40 +112,48 @@ final class EloquentModelDiscoverer implements CollectsDiscoveryWarnings, ModelD
             return $this->partialModel($class, $applicationOwned, $exception);
         }
 
-        $table = $instance->getTable();
+        try {
+            $shortName = ClassName::shortName($class);
+            $table = $this->nonEmptyString(
+                $instance->getTable(),
+                Str::snake(Str::pluralStudly($shortName)),
+            );
 
-        if (in_array($table, $context->excludedTables, true)) {
-            return null;
+            if (in_array($table, $context->excludedTables, true)) {
+                return null;
+            }
+
+            $traits = array_values(class_uses_recursive($class));
+            sort($traits, SORT_STRING);
+
+            $casts = $instance->getCasts();
+            ksort($casts, SORT_STRING);
+
+            return new ModelData(
+                id: StableIdentifier::model($class),
+                class: $class,
+                shortName: $shortName,
+                namespace: ClassName::namespace($class),
+                table: $table,
+                connection: $this->nonEmptyString($instance->getConnectionName(), 'default'),
+                primaryKey: $this->nullableString($instance->getKeyName()),
+                keyType: $this->nonEmptyString($instance->getKeyType(), 'int'),
+                incrementing: (bool) $instance->getIncrementing(),
+                timestamps: $instance->usesTimestamps(),
+                softDeletes: in_array(SoftDeletes::class, $traits, true),
+                traits: $traits,
+                casts: array_map(static fn (mixed $cast): string => (string) $cast, $casts),
+                fillable: array_values($instance->getFillable()),
+                guarded: array_values($instance->getGuarded()),
+                hidden: array_values($instance->getHidden()),
+                visible: array_values($instance->getVisible()),
+                status: DiscoveryStatus::Complete,
+                warnings: [],
+                applicationOwned: $applicationOwned,
+            );
+        } catch (Throwable $exception) {
+            return $this->partialModel($class, $applicationOwned, $exception);
         }
-
-        $traits = array_values(class_uses_recursive($class));
-        sort($traits, SORT_STRING);
-
-        $casts = $instance->getCasts();
-        ksort($casts, SORT_STRING);
-
-        return new ModelData(
-            id: StableIdentifier::model($class),
-            class: $class,
-            shortName: ClassName::shortName($class),
-            namespace: ClassName::namespace($class),
-            table: $table,
-            connection: $instance->getConnectionName() ?? 'default',
-            primaryKey: $instance->getKeyName(),
-            keyType: $instance->getKeyType(),
-            incrementing: $instance->getIncrementing(),
-            timestamps: $instance->usesTimestamps(),
-            softDeletes: in_array(SoftDeletes::class, $traits, true),
-            traits: $traits,
-            casts: array_map(static fn (mixed $cast): string => (string) $cast, $casts),
-            fillable: array_values($instance->getFillable()),
-            guarded: array_values($instance->getGuarded()),
-            hidden: array_values($instance->getHidden()),
-            visible: array_values($instance->getVisible()),
-            status: DiscoveryStatus::Complete,
-            warnings: [],
-            applicationOwned: $applicationOwned,
-        );
     }
 
     public function pullWarnings(): array
@@ -154,6 +162,16 @@ final class EloquentModelDiscoverer implements CollectsDiscoveryWarnings, ModelD
         $this->warnings = [];
 
         return $warnings;
+    }
+
+    private function nonEmptyString(mixed $value, string $fallback): string
+    {
+        return is_string($value) && $value !== '' ? $value : $fallback;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**

@@ -10,5 +10,5 @@ namespace LaBoiteACode\DependencyGraph\Domain;
  */
 final class SchemaVersion
 {
-    public const CURRENT = '1.1';
+    public const CURRENT = '1.2';
 }
