@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-07-29
+
+### Fixed
+
+- Keep discovery and every table dataset available when an Eloquent model disables its primary key with `false`; absent primary keys are now represented by `null`, and unexpected model metadata failures are isolated as partial records.
+- Bump the snapshot schema to `1.2` so cached discovery data is rebuilt after the nullable primary-key fix.
+
 ## [1.1.0] - 2026-07-28
 
 ### Added
@@ -54,6 +61,7 @@ First stable release.
 - Local-only visibility by default with a configurable visibility callback.
 - English and French translations.
 
-[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/releases/tag/v1.0.0

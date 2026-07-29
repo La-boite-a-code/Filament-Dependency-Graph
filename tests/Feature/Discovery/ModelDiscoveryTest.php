@@ -8,6 +8,7 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\AuditEntry;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\BrokenModel;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Image;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\ModelWithoutPrimaryKey;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Order;
 
 function discoveredModels(mixed ...$overrides): array
@@ -50,6 +51,14 @@ it('discovers table, connection, primary key and key type metadata', function ()
         ->and($audit->timestamps)->toBeFalse()
         ->and($image->keyType)->toBe('string')
         ->and($image->incrementing)->toBeFalse();
+});
+
+it('supports models that explicitly disable their primary key', function (): void {
+    $model = discoveredModels()[ModelWithoutPrimaryKey::class];
+
+    expect($model->primaryKey)->toBeNull()
+        ->and($model->table)->toBe('reporting_view')
+        ->and($model->status)->toBe(DiscoveryStatus::Complete);
 });
 
 it('discovers soft deletes, traits, casts and fillable attributes', function (): void {

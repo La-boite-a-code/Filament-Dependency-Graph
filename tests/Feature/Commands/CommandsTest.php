@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\File;
+use LaBoiteACode\DependencyGraph\Domain\SchemaVersion;
 
 it('caches the snapshot and reports counts', function (): void {
     $this->artisan('filament-dependency-graph:cache')
@@ -26,7 +27,7 @@ it('rejects an invalid scope option', function (): void {
 
 it('exports json to standard output', function (): void {
     $this->artisan('filament-dependency-graph:export', ['--format' => 'json'])
-        ->expectsOutputToContain('"schemaVersion": "1.1"')
+        ->expectsOutputToContain(sprintf('"schemaVersion": "%s"', SchemaVersion::CURRENT))
         ->assertSuccessful();
 });
 
@@ -55,7 +56,7 @@ it('writes the export to a file', function (): void {
 
     $decoded = json_decode((string) file_get_contents($path), true);
 
-    expect($decoded['schemaVersion'])->toBe('1.1');
+    expect($decoded['schemaVersion'])->toBe(SchemaVersion::CURRENT);
 
     File::deleteDirectory(dirname($path));
 });
