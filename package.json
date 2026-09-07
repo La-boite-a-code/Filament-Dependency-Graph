@@ -5,7 +5,7 @@
     "build": "node bin/build.js"
   },
   "devDependencies": {
-    "cytoscape": "^3.30.0",
+    "cytoscape": "^3.34.2",
     "cytoscape-dagre": "^4.0.0",
     "cytoscape-fcose": "^2.2.0",
     "esbuild": "^0.28.2"
