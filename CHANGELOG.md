@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
-- Rebuild the published frontend bundle with esbuild 0.28.2 and cytoscape-dagre 4.0.1 so `dist/` matches the declared npm dependencies.
+- Rebuild the published frontend bundle with cytoscape 3.34.3, cytoscape-dagre 4.0.1 and esbuild 0.28.2 so `dist/` matches the declared npm dependencies.
 - Rewrite the cycle detector without a by-reference recursive closure so static analysis infers its component types correctly on PHPStan 2.2.
 
 ### Changed
