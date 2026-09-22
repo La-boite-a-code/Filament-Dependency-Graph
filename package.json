@@ -6,7 +6,7 @@
   },
   "devDependencies": {
     "cytoscape": "^3.30.0",
-    "cytoscape-dagre": "^4.0.0",
+    "cytoscape-dagre": "^4.0.1",
     "cytoscape-fcose": "^2.2.0",
     "esbuild": "^0.28.2"
   }
