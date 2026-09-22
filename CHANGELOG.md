@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-22
+
+### Fixed
+
+- Rebuild the published frontend bundle with esbuild 0.28.2 and cytoscape-dagre 4.0.1 so `dist/` matches the declared npm dependencies.
+- Rewrite the cycle detector without a by-reference recursive closure so static analysis infers its component types correctly on PHPStan 2.2.
+
+### Changed
+
+- Rebuild and commit `dist/` automatically on Dependabot npm pull requests, then run the checks against the rebuilt commit.
+- Allow every CI workflow to be started manually and stop persisting Git credentials in read-only checkouts.
+
 ## [1.1.1] - 2026-07-29
 
 ### Fixed
@@ -61,7 +73,8 @@ First stable release.
 - Local-only visibility by default with a configurable visibility callback.
 - English and French translations.
 
-[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/releases/tag/v1.0.0
