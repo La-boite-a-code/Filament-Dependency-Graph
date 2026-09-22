@@ -16,6 +16,26 @@ use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
  */
 final class CycleDetector
 {
+    /** @var array<string, list<string>> */
+    private array $adjacency = [];
+
+    private int $index = 0;
+
+    /** @var array<string, int> */
+    private array $indexes = [];
+
+    /** @var array<string, int> */
+    private array $lowLinks = [];
+
+    /** @var array<string, bool> */
+    private array $onStack = [];
+
+    /** @var list<string> */
+    private array $stack = [];
+
+    /** @var list<list<string>> */
+    private array $components = [];
+
     /**
      * Returns cycle groups as sorted lists of node ids. A group is a cycle
      * when it contains more than one node, or one node with a self edge.
@@ -24,8 +44,16 @@ final class CycleDetector
      */
     public function detect(Graph $graph): array
     {
-        $adjacency = [];
+        $this->adjacency = [];
+        $this->index = 0;
+        $this->indexes = [];
+        $this->lowLinks = [];
+        $this->onStack = [];
+        $this->stack = [];
+        $this->components = [];
+
         $selfLoops = [];
+        $nodeIds = [];
 
         foreach ($graph->edgesOfType(EdgeType::ModelRelation) as $edge) {
             $source = $edge->source->value;
@@ -35,77 +63,23 @@ final class CycleDetector
                 $selfLoops[$source] = true;
             }
 
-            $adjacency[$source][] = $target;
-        }
-
-        $index = 0;
-        $indexes = [];
-        $lowLinks = [];
-        $onStack = [];
-        $stack = [];
-        $components = [];
-
-        $strongConnect = function (string $node) use (
-            &$strongConnect,
-            &$index,
-            &$indexes,
-            &$lowLinks,
-            &$onStack,
-            &$stack,
-            &$components,
-            $adjacency,
-        ): void {
-            $indexes[$node] = $index;
-            $lowLinks[$node] = $index;
-            $index++;
-            $stack[] = $node;
-            $onStack[$node] = true;
-
-            foreach ($adjacency[$node] ?? [] as $neighbour) {
-                if (! isset($indexes[$neighbour])) {
-                    $strongConnect($neighbour);
-                    $lowLinks[$node] = min($lowLinks[$node], $lowLinks[$neighbour]);
-                } elseif ($onStack[$neighbour] ?? false) {
-                    $lowLinks[$node] = min($lowLinks[$node], $indexes[$neighbour]);
-                }
-            }
-
-            if ($lowLinks[$node] === $indexes[$node]) {
-                $component = [];
-
-                do {
-                    $member = array_pop($stack);
-
-                    if ($member === null) {
-                        break;
-                    }
-
-                    $onStack[$member] = false;
-                    $component[] = $member;
-                } while ($member !== $node);
-
-                $components[] = $component;
-            }
-        };
-
-        $nodeIds = array_keys($adjacency);
-
-        foreach ($graph->edgesOfType(EdgeType::ModelRelation) as $edge) {
-            $nodeIds[] = $edge->target->value;
+            $this->adjacency[$source][] = $target;
+            $nodeIds[] = $source;
+            $nodeIds[] = $target;
         }
 
         $nodeIds = array_values(array_unique($nodeIds));
         sort($nodeIds, SORT_STRING);
 
         foreach ($nodeIds as $node) {
-            if (! isset($indexes[$node])) {
-                $strongConnect($node);
+            if (! isset($this->indexes[$node])) {
+                $this->strongConnect($node);
             }
         }
 
         $cycles = [];
 
-        foreach ($components as $component) {
+        foreach ($this->components as $component) {
             if (count($component) > 1 || isset($selfLoops[$component[0]])) {
                 sort($component, SORT_STRING);
                 $cycles[] = $component;
@@ -115,5 +89,42 @@ final class CycleDetector
         usort($cycles, static fn (array $a, array $b): int => strcmp($a[0], $b[0]));
 
         return $cycles;
+    }
+
+    private function strongConnect(string $node): void
+    {
+        $this->indexes[$node] = $this->index;
+        $this->lowLinks[$node] = $this->index;
+        $this->index++;
+        $this->stack[] = $node;
+        $this->onStack[$node] = true;
+
+        foreach ($this->adjacency[$node] ?? [] as $neighbour) {
+            if (! isset($this->indexes[$neighbour])) {
+                $this->strongConnect($neighbour);
+                $this->lowLinks[$node] = min($this->lowLinks[$node], $this->lowLinks[$neighbour]);
+            } elseif ($this->onStack[$neighbour] ?? false) {
+                $this->lowLinks[$node] = min($this->lowLinks[$node], $this->indexes[$neighbour]);
+            }
+        }
+
+        if ($this->lowLinks[$node] !== $this->indexes[$node]) {
+            return;
+        }
+
+        $component = [];
+
+        do {
+            $member = array_pop($this->stack);
+
+            if ($member === null) {
+                break;
+            }
+
+            $this->onStack[$member] = false;
+            $component[] = $member;
+        } while ($member !== $node);
+
+        $this->components[] = $component;
     }
 }
