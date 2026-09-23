@@ -93,3 +93,29 @@ it('supports focus options on export', function (): void {
         '--direction' => 'outgoing',
     ])->assertSuccessful();
 });
+
+it('exports the HTTP scope filtered by middleware', function (): void {
+    $path = sys_get_temp_dir() . '/fdg-http-export-test/http-graph.json';
+    File::deleteDirectory(dirname($path));
+
+    $this->artisan('filament-dependency-graph:export', [
+        '--format' => 'json',
+        '--scope' => 'http',
+        '--middleware' => 'auth',
+        '--output' => $path,
+        '--force' => true,
+    ])->assertSuccessful();
+
+    $decoded = json_decode((string) file_get_contents($path), true);
+    $routes = array_values(array_filter($decoded['nodes'], static fn (array $node): bool => $node['type'] === 'route'));
+
+    expect($decoded['scope'])->toBe('http')
+        ->and($decoded['filters']['middleware'])->toBe('auth')
+        ->and(array_column($routes, 'label'))->toEqualCanonicalizing([
+            'POST /orders',
+            'PUT /orders/{order}',
+            'DELETE /orders/{order}',
+        ]);
+
+    File::deleteDirectory(dirname($path));
+});

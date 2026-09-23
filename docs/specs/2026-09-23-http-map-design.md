@@ -257,3 +257,19 @@ Written test first, with Pest.
 - Work happens on `feature/http-map`, branched from `main`.
 - Atomic commits per plan step, authored by Alexandre Ribes, with no tool attribution.
 - A pull request to `main`; the `v1.2.0` tag and GitHub release follow the existing format, only on request.
+
+## Amendments made during implementation
+
+Settled while building 1.2.0; where they differ, these take precedence over the sections above.
+
+1. **Route identifiers** use the methods (without `HEAD`), the domain and the URI, never the name: names are optional and may repeat.
+2. **Middleware** is the list declared on the route (group names such as `web` and aliases such as `auth` as written), excluded middleware removed. Groups are not expanded. Middleware declared inside a controller is not read, because reading it may require instantiating the controller.
+3. **Dispatch detection** is class-driven: `X::dispatch*()`, `X::broadcast()` and `X::withChain()` static calls plus every `new X` expression are collected, and only classes whose type makes them a job, mailable, notification or event are kept. This covers every call shape of the §2 table without matching each one.
+4. **Policies** are resolved in the order of `Gate::getPolicyFor()`: registered map, `#[UsePolicy]` attribute when the framework provides it, the gate's own `guessPolicyName()` read through reflection (a custom `guessPolicyNamesUsing()` callback is therefore honoured), then registered parent classes. The documented limitation disappears. Sources: `registered`, `attribute`, `convention`.
+5. **Contracts**: `HttpMapDiscoverer` and `PolicyDiscoverer` are the replaceable entry points; route, controller, form request, event and dispatchable discovery are internal collaborators.
+6. **Form request rules**: string rules are split on `|`, closures become `closure`, `Stringable` rule objects are cast (`in:"draft","placed"`), other objects become their class name.
+7. **Events without dispatcher** carry a dedicated `Not dispatched` badge; `OrphanDetector` keeps its model-only meaning and counts `controller_uses_model` as a connection.
+8. **Node subtitles** stay short for readability: controllers, form requests and events have none (the namespace is in the inspector and the tables); listeners and dispatched classes show `queued` when applicable.
+9. **Middleware filter** is `GraphQuery::$middleware` (`auth` keeps routes using it, `!auth` routes without it, parameters such as `throttle:api` match their name). It is applied inside the HTTP traversal, which is action-aware: from a controller, only the edges of methods reached by a kept route are followed. The export command exposes it as `--middleware`.
+10. **Tables and tree**: the HTTP scope offers the routes, events, dispatches and models datasets; switching between HTTP and non-HTTP scopes resets the dataset. The tree adds a group for events nothing dispatches, and uses a minimum depth of four levels so a whole request chain is readable.
+11. **Laravel scope** excludes the HTTP node types explicitly, so it renders exactly what it rendered before.

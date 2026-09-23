@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-23
+
+### Added
+
+- Add an HTTP scope that maps application routes to their controller actions, form requests, route-bound and referenced models, model policies, events and listeners, and the jobs, mailables and notifications dispatched along the way.
+- Discover routes from the router (route cache included), listeners from the event dispatcher (event discovery included) and policies through registered policies, the `UsePolicy` attribute and the gate's naming convention, without instantiating controllers, form requests or policies.
+- Detect dispatches and model references statically in controller actions, listeners and job `handle()` methods, following injected application classes one level deep, with `file:line` locations and the traversed classes on every edge.
+- Read form request rules on demand with the opt-in `http.form_request_rules` option.
+- Add HTTP inspectors for routes, controllers (action by action), form requests, policies, events, listeners and dispatched classes, plus an HTTP usage section on models and details on HTTP edges.
+- Add routes, events and dispatches table datasets, a route tree grouped by URI segment with a group for events nothing dispatches, and a `Not dispatched` badge on those events.
+- Add a middleware filter to the HTTP scope, available in the explorer, in `GraphQuery::$middleware` and as `--middleware` on `filament-dependency-graph:export`.
+- Add the `http` configuration block and the `allowHttpScope()` plugin method.
+- Style the new node types in the graph from the Filament palette and label controller methods and dispatch kinds in the graph and in Mermaid exports.
+
+### Changed
+
+- Extract the token based source scanner shared by Livewire and HTTP discovery; Livewire discovery output is unchanged.
+- Count controller usage as a connection when detecting orphan models.
+- Bump the snapshot schema to `1.3` for the HTTP map section; cached snapshots are rebuilt automatically.
+
 ## [1.1.2] - 2026-09-22
 
 ### Fixed
@@ -73,7 +93,8 @@ First stable release.
 - Local-only visibility by default with a configurable visibility callback.
 - English and French translations.
 
-[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/La-boite-a-code/Filament-Dependency-Graph/compare/v1.0.0...v1.1.0

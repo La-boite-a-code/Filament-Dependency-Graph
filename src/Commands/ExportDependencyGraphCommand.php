@@ -17,8 +17,9 @@ final class ExportDependencyGraphCommand extends Command
 {
     protected $signature = 'filament-dependency-graph:export
         {--format=json : Export format, json or mermaid}
-        {--scope= : Graph scope, filament or laravel}
+        {--scope= : Graph scope, filament, laravel or http}
         {--panel=* : Only include the given panel ids}
+        {--middleware= : HTTP scope only: keep routes using a middleware (auth) or not using it (!auth)}
         {--focus= : Focus on a node id, for example model:app.models.order}
         {--depth= : Focus traversal depth}
         {--direction=both : Focus direction, incoming, outgoing or both}
@@ -94,6 +95,7 @@ final class ExportDependencyGraphCommand extends Command
 
         $focus = $this->option('focus');
         $depthOption = $this->option('depth');
+        $middleware = $this->option('middleware');
 
         $directionOption = $this->option('direction');
         $direction = TraversalDirection::tryFrom(is_string($directionOption) ? $directionOption : 'both')
@@ -106,6 +108,7 @@ final class ExportDependencyGraphCommand extends Command
             depth: is_numeric($depthOption) ? (int) $depthOption : null,
             direction: $direction,
             includeOrphans: $defaults->includeOrphans,
+            middleware: is_string($middleware) && $middleware !== '' ? $middleware : null,
         );
     }
 }

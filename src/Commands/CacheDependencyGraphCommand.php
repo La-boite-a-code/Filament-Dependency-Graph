@@ -15,7 +15,7 @@ use Throwable;
 final class CacheDependencyGraphCommand extends Command
 {
     protected $signature = 'filament-dependency-graph:cache
-        {--scope= : Discovery scope, filament or laravel}
+        {--scope= : Discovery scope, filament, laravel or http}
         {--panel=* : Only discover the given panel ids}
         {--no-schema : Skip database schema inspection}
         {--force : Rebuild even when a cached snapshot exists}';
