@@ -10,4 +10,11 @@ enum EdgeType: string
     case ResourceUsesModel = 'resource_uses_model';
     case LivewireUsesModel = 'livewire_uses_model';
     case ModelRelation = 'model_relation';
+    case RouteHandledByController = 'route_handled_by_controller';
+    case RouteRendersLivewire = 'route_renders_livewire';
+    case ControllerValidatesWith = 'controller_validates_with';
+    case ControllerUsesModel = 'controller_uses_model';
+    case ModelGuardedByPolicy = 'model_guarded_by_policy';
+    case EventHandledByListener = 'event_handled_by_listener';
+    case Dispatches = 'dispatches';
 }

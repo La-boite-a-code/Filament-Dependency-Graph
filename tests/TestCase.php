@@ -5,9 +5,18 @@ declare(strict_types=1);
 namespace LaBoiteACode\DependencyGraph\Tests;
 
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use LaBoiteACode\DependencyGraph\DependencyGraphServiceProvider;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Database\FixtureTables;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Events\OrderArchived;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Events\OrderPlaced;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Listeners\SendOrderConfirmation;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Listeners\UpdateInventory;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Policies\CatalogPolicy;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Product;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Panels\AdminPanelProvider;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Panels\CustomerPanelProvider;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Panels\OperationsPanelProvider;
@@ -20,6 +29,20 @@ abstract class TestCase extends Orchestra
         parent::setUp();
 
         FixtureTables::create();
+
+        Gate::policy(Product::class, CatalogPolicy::class);
+        Event::listen(OrderPlaced::class, SendOrderConfirmation::class);
+        Event::listen(OrderPlaced::class, [UpdateInventory::class, 'handle']);
+        Event::listen(OrderArchived::class, UpdateInventory::class . '@release');
+        Event::listen(OrderArchived::class, static function (): void {});
+    }
+
+    /**
+     * @param  Router  $router
+     */
+    protected function defineRoutes($router): void
+    {
+        require __DIR__ . '/Fixtures/Http/routes.php';
     }
 
     protected function getPackageProviders($app): array
@@ -76,6 +99,14 @@ abstract class TestCase extends Orchestra
             $config->set('filament-dependency-graph.livewire.namespaces', [
                 'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Livewire\\',
             ]);
+
+            $config->set('filament-dependency-graph.http.controller_namespaces', [
+                'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Http\\Controllers\\',
+            ]);
+
+            $config->set('filament-dependency-graph.http.application_namespaces', [
+                'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\',
+            ]);
         });
     }
 
@@ -92,6 +123,8 @@ abstract class TestCase extends Orchestra
             'livewireNamespaces' => ['LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Livewire\\'],
             'basePath' => dirname(__DIR__),
             'vendorPath' => dirname(__DIR__) . '/vendor',
+            'httpControllerNamespaces' => ['LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\Http\\Controllers\\'],
+            'httpApplicationNamespaces' => ['LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\'],
         ];
 
         /** @var array<string, mixed> $arguments */

@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Graph;
 
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\ControllerActionData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\ControllerData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\DispatchableData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\DispatchReference;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\EventData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\FormRequestData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\ListenerData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\PolicyData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PageData;
@@ -150,6 +159,189 @@ final class NodeFactory
         );
     }
 
+    public function forRoute(RouteData $route): Node
+    {
+        $badges = $route->actionType === RouteData::ACTION_CONTROLLER ? [] : [ucfirst($route->actionType)];
+
+        if ($route->status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return new Node(
+            id: NodeId::fromString($route->id),
+            type: NodeType::Route,
+            label: $route->label(),
+            subtitle: $route->name,
+            metadata: [
+                'uri' => $route->uri,
+                'methods' => $route->methods,
+                'name' => $route->name,
+                'domain' => $route->domain,
+                'action_type' => $route->actionType,
+                'controller_class' => $route->controllerClass,
+                'controller_method' => $route->controllerMethod,
+                'livewire_class' => $route->livewireClass,
+                'view' => $route->view,
+                'middleware' => $route->middleware,
+                'resolved_middleware' => $route->resolvedMiddleware,
+                'bound_parameters' => $route->boundParameters,
+                'file' => $route->file,
+                'warnings' => $route->warnings,
+            ],
+            badges: $badges,
+            status: $route->status,
+        );
+    }
+
+    public function forController(ControllerData $controller): Node
+    {
+        $count = count($controller->actions);
+        $badges = [sprintf('%d %s', $count, $count === 1 ? 'action' : 'actions')];
+
+        if ($controller->status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return new Node(
+            id: NodeId::fromString($controller->id),
+            type: NodeType::Controller,
+            label: ClassName::shortName($controller->class),
+            subtitle: null,
+            metadata: [
+                'class' => $controller->class,
+                'namespace' => ClassName::namespace($controller->class),
+                'file' => $controller->file,
+                'actions' => array_map(
+                    static fn (ControllerActionData $action): array => $action->toArray(),
+                    $controller->actions,
+                ),
+                'warnings' => $controller->warnings,
+            ],
+            badges: $badges,
+            status: $controller->status,
+        );
+    }
+
+    public function forFormRequest(FormRequestData $request): Node
+    {
+        $badges = $request->rules === null ? [] : ['Rules'];
+
+        if ($request->status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return new Node(
+            id: NodeId::fromString($request->id),
+            type: NodeType::FormRequest,
+            label: ClassName::shortName($request->class),
+            subtitle: null,
+            metadata: [
+                'class' => $request->class,
+                'namespace' => ClassName::namespace($request->class),
+                'file' => $request->file,
+                'has_authorize' => $request->hasAuthorize,
+                'has_rules' => $request->hasRules,
+                'rules' => $request->rules,
+                'warnings' => $request->warnings,
+            ],
+            badges: $badges,
+            status: $request->status,
+        );
+    }
+
+    /**
+     * @param  list<PolicyData>  $guards  Every model/policy pair of this policy; defaults to the given one.
+     */
+    public function forPolicy(PolicyData $policy, array $guards = []): Node
+    {
+        $guards = $guards === [] ? [$policy] : $guards;
+        $modelClasses = array_map(static fn (PolicyData $guard): string => $guard->modelClass, $guards);
+        $sources = array_values(array_unique(array_map(static fn (PolicyData $guard): string => $guard->source, $guards)));
+
+        return new Node(
+            id: NodeId::fromString($policy->id),
+            type: NodeType::Policy,
+            label: ClassName::shortName($policy->class),
+            subtitle: implode(', ', array_map(static fn (string $class): string => ClassName::shortName($class), $modelClasses)),
+            metadata: [
+                'class' => $policy->class,
+                'namespace' => ClassName::namespace($policy->class),
+                'file' => $policy->file,
+                'model_classes' => $modelClasses,
+                'abilities' => $policy->abilities,
+                'sources' => $sources,
+                'warnings' => $policy->warnings,
+            ],
+            badges: array_map('ucfirst', $sources),
+            status: $policy->status,
+        );
+    }
+
+    /**
+     * @param  list<string>  $badges
+     */
+    public function forEvent(EventData $event, array $badges = []): Node
+    {
+        return new Node(
+            id: NodeId::fromString($event->id),
+            type: NodeType::Event,
+            label: ClassName::shortName($event->class),
+            subtitle: null,
+            metadata: [
+                'class' => $event->class,
+                'namespace' => ClassName::namespace($event->class),
+                'file' => $event->file,
+                'listener_classes' => $event->listenerClasses,
+                'closure_listener_count' => $event->closureListenerCount,
+                'warnings' => $event->warnings,
+            ],
+            badges: $badges,
+            status: $event->status,
+        );
+    }
+
+    public function forListener(ListenerData $listener): Node
+    {
+        return new Node(
+            id: NodeId::fromString($listener->id),
+            type: NodeType::Listener,
+            label: ClassName::shortName($listener->class),
+            subtitle: $listener->queued ? 'queued' : null,
+            metadata: [
+                'class' => $listener->class,
+                'namespace' => ClassName::namespace($listener->class),
+                'file' => $listener->file,
+                'events' => $listener->events,
+                'queued' => $listener->queued,
+                'dispatches' => DispatchReference::listToArray($listener->dispatches),
+                'warnings' => $listener->warnings,
+            ],
+            badges: $this->queueBadges($listener->queued, $listener->status),
+            status: $listener->status,
+        );
+    }
+
+    public function forDispatchable(DispatchableData $dispatchable): Node
+    {
+        return new Node(
+            id: NodeId::fromString($dispatchable->id),
+            type: $dispatchable->kind->nodeType(),
+            label: ClassName::shortName($dispatchable->class),
+            subtitle: $dispatchable->queued ? 'queued' : null,
+            metadata: [
+                'class' => $dispatchable->class,
+                'namespace' => ClassName::namespace($dispatchable->class),
+                'file' => $dispatchable->file,
+                'kind' => $dispatchable->kind->value,
+                'queued' => $dispatchable->queued,
+                'dispatches' => DispatchReference::listToArray($dispatchable->dispatches),
+                'warnings' => $dispatchable->warnings,
+            ],
+            badges: $this->queueBadges($dispatchable->queued, $dispatchable->status),
+            status: $dispatchable->status,
+        );
+    }
+
     /**
      * One placeholder node represents the unresolved targets of a morphTo
      * relation, as a single polymorphic group.
@@ -170,6 +362,20 @@ final class NodeFactory
             badges: ['Polymorphic'],
             status: $relation->status,
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function queueBadges(bool $queued, DiscoveryStatus $status): array
+    {
+        $badges = $queued ? ['Queued'] : [];
+
+        if ($status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return $badges;
     }
 
     public static function polymorphicTargetId(RelationData $relation): string

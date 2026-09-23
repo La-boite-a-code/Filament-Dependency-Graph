@@ -72,3 +72,25 @@ it('falls back to LR for invalid directions and produces deterministic output', 
     expect($output)->toContain('flowchart LR')
         ->and($output)->toBe((new MermaidGraphExporter)->export($graph, new ExportOptions(mermaidDirection: 'DIAGONAL')));
 });
+
+it('labels controller methods and dispatch kinds in the HTTP map', function (): void {
+    $graph = fakeGraph(
+        [
+            fakeNode('route:POST:/orders', label: 'POST /orders'),
+            fakeNode('controller:app.order-controller', label: 'OrderController'),
+            fakeNode('form-request:app.store-order', label: 'StoreOrder'),
+            fakeNode('job:app.ship-order', label: 'ShipOrder'),
+        ],
+        [
+            fakeEdge('route:POST:/orders', 'controller:app.order-controller', EdgeType::RouteHandledByController, 'store'),
+            fakeEdge('controller:app.order-controller', 'form-request:app.store-order', EdgeType::ControllerValidatesWith, 'store'),
+            fakeEdge('controller:app.order-controller', 'job:app.ship-order', EdgeType::Dispatches, 'job'),
+        ],
+    );
+
+    $output = (new MermaidGraphExporter)->export($graph, new ExportOptions);
+
+    expect($output)->toContain('route_POST__orders -- store --> controller_app_order_controller')
+        ->and($output)->toContain('controller_app_order_controller -- job --> job_app_ship_order')
+        ->and($output)->toContain('controller_app_order_controller --> form_request_app_store_order');
+});

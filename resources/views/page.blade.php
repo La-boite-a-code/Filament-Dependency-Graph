@@ -41,6 +41,9 @@
                             @if ($this->isLaravelScopeAllowed())
                                 <option value="laravel">{{ __('filament-dependency-graph::graph.toolbar.scope_laravel') }}</option>
                             @endif
+                            @if ($this->isHttpScopeAllowed())
+                                <option value="http">{{ __('filament-dependency-graph::graph.toolbar.scope_http') }}</option>
+                            @endif
                         </x-filament::input.select>
                     </x-filament::input.wrapper>
                 </div>

@@ -24,10 +24,12 @@ use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
 use LaBoiteACode\DependencyGraph\Contracts\DependencyGraphManager;
 use LaBoiteACode\DependencyGraph\Contracts\GraphBuilder;
 use LaBoiteACode\DependencyGraph\Contracts\GraphCache;
+use LaBoiteACode\DependencyGraph\Contracts\HttpMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\LivewireComponentDiscoverer as LivewireComponentDiscovererContract;
 use LaBoiteACode\DependencyGraph\Contracts\ModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\NodeInspector;
 use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
+use LaBoiteACode\DependencyGraph\Contracts\PolicyDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\RelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ResourceDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\ClassCandidateFinder;
@@ -35,16 +37,21 @@ use LaBoiteACode\DependencyGraph\Discovery\EloquentModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\EloquentRelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\FilamentPanelDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\FilamentResourceDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\Http\DispatchClassifier;
+use LaBoiteACode\DependencyGraph\Discovery\Http\GatePolicyDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\Http\LaravelHttpMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\LaravelApplicationDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\LivewireComponentDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\ModelInstantiator;
 use LaBoiteACode\DependencyGraph\Discovery\Support\SchemaInspector;
+use LaBoiteACode\DependencyGraph\Discovery\Support\SourceScanner;
 use LaBoiteACode\DependencyGraph\Domain\Exceptions\InvalidConfigurationException;
 use LaBoiteACode\DependencyGraph\Export\ExportManager;
 use LaBoiteACode\DependencyGraph\Export\JsonGraphExporter;
 use LaBoiteACode\DependencyGraph\Export\MermaidGraphExporter;
 use LaBoiteACode\DependencyGraph\Graph\DefaultGraphBuilder;
 use LaBoiteACode\DependencyGraph\Inspection\DefaultNodeInspector;
+use LaBoiteACode\DependencyGraph\Inspection\HttpNodeInspector;
 use LaBoiteACode\DependencyGraph\Inspection\LivewireComponentInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ModelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\PanelInspector;
@@ -75,6 +82,8 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
         $this->app->singleton(ModelInstantiator::class);
         $this->app->singleton(ClassCandidateFinder::class);
         $this->app->singleton(SchemaInspector::class);
+        $this->app->singleton(SourceScanner::class);
+        $this->app->singleton(DispatchClassifier::class);
 
         $this->app->singleton(FilamentAdapter::class, static function (): FilamentAdapter {
             return match (FilamentVersion::detect()) {
@@ -91,6 +100,8 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
         $this->app->singleton(PanelDiscoverer::class, FilamentPanelDiscoverer::class);
         $this->app->singleton(ResourceDiscoverer::class, FilamentResourceDiscoverer::class);
         $this->app->singleton(LivewireComponentDiscovererContract::class, LivewireComponentDiscoverer::class);
+        $this->app->singleton(HttpMapDiscoverer::class, LaravelHttpMapDiscoverer::class);
+        $this->app->singleton(PolicyDiscoverer::class, GatePolicyDiscoverer::class);
         $this->app->singleton(ApplicationDiscovery::class, LaravelApplicationDiscoverer::class);
         $this->app->singleton(GraphBuilder::class, DefaultGraphBuilder::class);
 
@@ -136,6 +147,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
                 new ModelInspector,
                 new ResourceInspector,
                 new LivewireComponentInspector,
+                new HttpNodeInspector,
                 new PanelInspector,
             ]);
         });

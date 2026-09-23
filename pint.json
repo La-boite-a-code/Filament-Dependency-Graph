@@ -3,7 +3,8 @@
     "exclude": [
         "dist",
         "node_modules",
-        "tools"
+        "tools",
+        "tests/Fixtures/Http/Scanning"
     ],
     "rules": {
         "declare_strict_types": true,

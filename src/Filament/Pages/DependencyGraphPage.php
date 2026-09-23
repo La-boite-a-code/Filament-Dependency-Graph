@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaBoiteACode\DependencyGraph\Filament\Pages;
 
 use BackedEnum;
+use Closure;
 use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -29,11 +30,13 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Enums\RelationType;
 use LaBoiteACode\DependencyGraph\Domain\Enums\TraversalDirection;
+use LaBoiteACode\DependencyGraph\Domain\Graph\Edge;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 use LaBoiteACode\DependencyGraph\Inspection\DefaultNodeInspector;
 use LaBoiteACode\DependencyGraph\Inspection\EdgeInspector;
+use LaBoiteACode\DependencyGraph\Support\ClassName;
 use LaBoiteACode\DependencyGraph\Support\SearchNormalizer;
 use Livewire\Attributes\Url;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -47,6 +50,8 @@ class DependencyGraphPage extends Page implements HasTable
     private const INSPECTOR_MODAL_ID = 'fdg-inspector';
 
     private const TABLE_DATASETS = ['models', 'livewire_components', 'relations', 'resources'];
+
+    private const HTTP_TABLE_DATASETS = ['routes', 'events', 'dispatches', 'models'];
 
     protected string $view = 'filament-dependency-graph::page';
 
@@ -100,9 +105,14 @@ class DependencyGraphPage extends Page implements HasTable
     #[Url(as: 'dataset')]
     public string $tableDataset = 'models';
 
+    #[Url(as: 'middleware')]
+    public string $middlewareFilter = '';
+
     protected ?Graph $memoizedGraph = null;
 
     protected ?Graph $memoizedSearchGraph = null;
+
+    protected bool $scopeSwitchesDatasets = false;
 
     public static function canAccess(): bool
     {
@@ -252,6 +262,7 @@ class DependencyGraphPage extends Page implements HasTable
 
         $this->scope = GraphScope::tryFrom($this->scope)->value
             ?? (is_string($defaultScope) ? $defaultScope : GraphScope::Filament->value);
+        $this->scope = $this->currentScope()->value;
 
         $this->direction = TraversalDirection::tryFrom($this->direction)->value
             ?? (string) $config->get('filament-dependency-graph.graph.default_direction', 'both');
@@ -261,9 +272,9 @@ class DependencyGraphPage extends Page implements HasTable
         $this->activeView = in_array($this->activeView, ['graph', 'tree', 'table'], true)
             ? $this->activeView
             : 'graph';
-        $this->tableDataset = in_array($this->tableDataset, self::TABLE_DATASETS, true)
+        $this->tableDataset = in_array($this->tableDataset, $this->availableTableDatasets(), true)
             ? $this->tableDataset
-            : 'models';
+            : $this->availableTableDatasets()[0];
 
         if (! $config->get('filament-dependency-graph.graph.show_panel_nodes', true)) {
             $this->hiddenNodeTypes[] = NodeType::Panel->value;
@@ -334,9 +345,33 @@ class DependencyGraphPage extends Page implements HasTable
         }
     }
 
+    public function updatingScope(mixed $scope): void
+    {
+        $this->scopeSwitchesDatasets = ($scope === GraphScope::Http->value) !== $this->isHttpScope();
+    }
+
+    /**
+     * Switching scope drops the filters and datasets that only make sense
+     * in the previous one.
+     */
+    public function updatedScope(): void
+    {
+        $this->scope = $this->currentScope()->value;
+        $this->middlewareFilter = '';
+
+        if ($this->scopeSwitchesDatasets || ! in_array($this->tableDataset, $this->availableTableDatasets(), true)) {
+            $this->tableDataset = $this->availableTableDatasets()[0];
+            $this->tableSearch = '';
+            $this->tableSort = null;
+        }
+
+        $this->forgetMemoizedGraphs();
+        $this->resetTable();
+    }
+
     public function setTableDataset(string $dataset): void
     {
-        if (! in_array($dataset, self::TABLE_DATASETS, true)) {
+        if (! in_array($dataset, $this->availableTableDatasets(), true)) {
             return;
         }
 
@@ -387,7 +422,7 @@ class DependencyGraphPage extends Page implements HasTable
         $this->onlyOrphans = false;
         $this->onlyCycles = false;
         $this->onlyWithoutResource = false;
-        $this->tableDataset = 'models';
+        $this->middlewareFilter = '';
         $this->tableSearch = '';
         $this->tableSort = null;
 
@@ -395,6 +430,8 @@ class DependencyGraphPage extends Page implements HasTable
 
         $scope = $config->get('filament-dependency-graph.default_scope', GraphScope::Filament);
         $this->scope = $scope instanceof GraphScope ? $scope->value : (string) $scope;
+        $this->scope = $this->currentScope()->value;
+        $this->tableDataset = $this->availableTableDatasets()[0];
         $this->direction = (string) $config->get('filament-dependency-graph.graph.default_direction', 'both');
         $this->showOrphans = (bool) $config->get('filament-dependency-graph.graph.show_orphans', true);
         $this->graphLayout = (string) $config->get('filament-dependency-graph.graph.default_layout', 'hierarchical');
@@ -418,6 +455,7 @@ class DependencyGraphPage extends Page implements HasTable
         $this->onlyWithoutResource = false;
         $this->namespaceFilter = '';
         $this->ownershipFilter = 'all';
+        $this->middlewareFilter = '';
         $this->hiddenNodeTypes = [];
         $this->hiddenRelationTypes = [];
 
@@ -535,6 +573,20 @@ class DependencyGraphPage extends Page implements HasTable
             return [];
         }
 
+        $maxDepth = $this->depth ?? (int) $this->configRepository()->get('filament-dependency-graph.graph.default_depth', 2);
+        $maxDepth = max($maxDepth, 1);
+        $http = $this->currentScope() === GraphScope::Http;
+
+        if ($http) {
+            // A route leads through its controller to models, dispatches and
+            // listeners: four levels are needed to read the whole chain.
+            $maxDepth = max($maxDepth, 4);
+        }
+
+        if ($http && ($this->selectedNodeId === null || ! $graph->hasNode($this->selectedNodeId))) {
+            return $this->httpTree($graph, $maxDepth);
+        }
+
         $roots = [];
 
         if ($this->selectedNodeId !== null && $graph->hasNode($this->selectedNodeId)) {
@@ -563,14 +615,14 @@ class DependencyGraphPage extends Page implements HasTable
             }
         }
 
-        $maxDepth = $this->depth ?? (int) $this->configRepository()->get('filament-dependency-graph.graph.default_depth', 2);
-        $maxDepth = max($maxDepth, 1);
-
         $tree = [];
 
         foreach ($roots as $rootId) {
             $visited = [];
-            $tree[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited);
+            $root = $graph->node($rootId);
+            $follow = $http && $root !== null ? $this->httpTreeFilter($graph, $root) : null;
+
+            $tree[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited, $follow);
         }
 
         return array_values(array_filter($tree));
@@ -617,29 +669,35 @@ class DependencyGraphPage extends Page implements HasTable
     public function getTableDatasetOptions(): array
     {
         $tables = $this->getTables();
-
-        return [
-            'models' => [
-                'label' => __('filament-dependency-graph::graph.table.models'),
-                'icon' => 'heroicon-m-circle-stack',
-                'count' => count($tables['models']),
-            ],
-            'livewire_components' => [
-                'label' => __('filament-dependency-graph::graph.table.livewire_components'),
-                'icon' => 'heroicon-m-bolt',
-                'count' => count($tables['livewire_components']),
-            ],
-            'relations' => [
-                'label' => __('filament-dependency-graph::graph.table.relations'),
-                'icon' => 'heroicon-m-arrows-right-left',
-                'count' => count($tables['relations']),
-            ],
-            'resources' => [
-                'label' => __('filament-dependency-graph::graph.table.resources'),
-                'icon' => 'heroicon-m-rectangle-stack',
-                'count' => count($tables['resources']),
-            ],
+        $icons = [
+            'models' => 'heroicon-m-circle-stack',
+            'livewire_components' => 'heroicon-m-bolt',
+            'relations' => 'heroicon-m-arrows-right-left',
+            'resources' => 'heroicon-m-rectangle-stack',
+            'routes' => 'heroicon-m-globe-alt',
+            'events' => 'heroicon-m-megaphone',
+            'dispatches' => 'heroicon-m-paper-airplane',
         ];
+
+        $options = [];
+
+        foreach ($this->availableTableDatasets() as $dataset) {
+            $options[$dataset] = [
+                'label' => __('filament-dependency-graph::graph.table.' . $dataset),
+                'icon' => $icons[$dataset],
+                'count' => count($tables[$dataset]),
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return non-empty-list<string>
+     */
+    protected function availableTableDatasets(): array
+    {
+        return $this->currentScope() === GraphScope::Http ? self::HTTP_TABLE_DATASETS : self::TABLE_DATASETS;
     }
 
     /**
@@ -648,6 +706,71 @@ class DependencyGraphPage extends Page implements HasTable
     protected function getDatasetTableColumns(): array
     {
         return match ($this->tableDataset) {
+            'routes' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.route'))
+                    ->description(fn (array $record): string => (string) ($record['name'] ?? ''))
+                    ->fontFamily(FontFamily::Mono)
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('action')
+                    ->label(__('filament-dependency-graph::graph.table.action'))
+                    ->placeholder('-')
+                    ->sortable(),
+                TextColumn::make('middleware')
+                    ->label(__('filament-dependency-graph::graph.table.middleware'))
+                    ->badge()
+                    ->separator(', ')
+                    ->color('gray')
+                    ->placeholder('-'),
+                TextColumn::make('form_requests')
+                    ->label(__('filament-dependency-graph::graph.table.form_requests'))
+                    ->placeholder('-')
+                    ->toggleable(),
+                TextColumn::make('models')
+                    ->label(__('filament-dependency-graph::graph.table.models'))
+                    ->placeholder('-')
+                    ->toggleable(),
+                $this->statusTableColumn(),
+            ],
+            'events' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.event'))
+                    ->description(fn (array $record): string => (string) ($record['namespace'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('listeners')
+                    ->label(__('filament-dependency-graph::graph.table.listeners'))
+                    ->placeholder('-'),
+                TextColumn::make('queued_listeners')
+                    ->label(__('filament-dependency-graph::graph.table.queued_listeners'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('dispatched_by')
+                    ->label(__('filament-dependency-graph::graph.table.dispatched_by'))
+                    ->placeholder(__('filament-dependency-graph::graph.table.not_dispatched')),
+                $this->statusTableColumn(),
+            ],
+            'dispatches' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.class'))
+                    ->description(fn (array $record): string => (string) ($record['namespace'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('kind')
+                    ->label(__('filament-dependency-graph::graph.table.kind'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => __('filament-dependency-graph::graph.inspector.types.' . $state))
+                    ->color('gray')
+                    ->sortable(),
+                IconColumn::make('queued')
+                    ->label(__('filament-dependency-graph::graph.table.queued'))
+                    ->boolean(),
+                TextColumn::make('dispatched_by')
+                    ->label(__('filament-dependency-graph::graph.table.dispatched_by'))
+                    ->placeholder('-'),
+                $this->statusTableColumn(),
+            ],
             'livewire_components' => [
                 TextColumn::make('label')
                     ->label(__('filament-dependency-graph::graph.table.component'))
@@ -853,14 +976,22 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
-     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, livewire_components: list<array<string, mixed>>}
+     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, livewire_components: list<array<string, mixed>>, routes: list<array<string, mixed>>, events: list<array<string, mixed>>, dispatches: list<array<string, mixed>>}
      */
     public function getTables(): array
     {
         try {
             $graph = $this->currentGraph();
         } catch (Throwable) {
-            return ['models' => [], 'relations' => [], 'resources' => [], 'livewire_components' => []];
+            return [
+                'models' => [],
+                'relations' => [],
+                'resources' => [],
+                'livewire_components' => [],
+                'routes' => [],
+                'events' => [],
+                'dispatches' => [],
+            ];
         }
 
         $models = [];
@@ -964,7 +1095,155 @@ class DependencyGraphPage extends Page implements HasTable
             'relations' => $this->sortRows($relations),
             'resources' => $this->sortRows($resources),
             'livewire_components' => $this->sortRows($livewireComponents),
+            ...$this->httpTables($graph),
         ];
+    }
+
+    /**
+     * @return array{routes: list<array<string, mixed>>, events: list<array<string, mixed>>, dispatches: list<array<string, mixed>>}
+     */
+    protected function httpTables(Graph $graph): array
+    {
+        $routes = [];
+
+        foreach ($graph->nodesOfType(NodeType::Route) as $node) {
+            $action = null;
+            $formRequests = [];
+            $models = [];
+
+            foreach ($this->stringMap($node->metadata['bound_parameters'] ?? []) as $class) {
+                $models[] = ClassName::shortName($class);
+            }
+
+            foreach ($graph->outgoingEdges($node->id) as $edge) {
+                $target = $graph->node($edge->target);
+
+                if ($target === null) {
+                    continue;
+                }
+
+                if ($edge->type === EdgeType::RouteRendersLivewire) {
+                    $action = $target->label;
+                }
+
+                if ($edge->type !== EdgeType::RouteHandledByController) {
+                    continue;
+                }
+
+                $action = $target->label . '@' . $edge->label;
+                $actions = $target->metadata['actions'] ?? [];
+                $details = is_array($actions) && is_array($actions[$edge->label] ?? null) ? $actions[$edge->label] : [];
+
+                foreach (is_array($details['form_requests'] ?? null) ? $details['form_requests'] : [] as $class) {
+                    $formRequests[] = ClassName::shortName((string) $class);
+                }
+
+                foreach (array_keys(is_array($details['models'] ?? null) ? $details['models'] : []) as $class) {
+                    $models[] = ClassName::shortName((string) $class);
+                }
+            }
+
+            $actionType = $node->metadata['action_type'] ?? null;
+            $models = array_values(array_unique($models));
+            sort($models, SORT_STRING);
+
+            $routes[] = [
+                'id' => $node->id->value,
+                'label' => $node->label,
+                'uri' => $node->metadata['uri'] ?? '',
+                'name' => $node->metadata['name'] ?? null,
+                'action' => $action ?? (is_string($actionType) ? ucfirst($actionType) : null),
+                'middleware' => implode(', ', array_filter(is_array($node->metadata['middleware'] ?? null) ? $node->metadata['middleware'] : [], 'is_string')),
+                'form_requests' => implode(', ', $formRequests),
+                'models' => implode(', ', $models),
+                'status' => $node->status->value,
+            ];
+        }
+
+        usort($routes, static fn (array $a, array $b): int => [$a['uri'], $a['label']] <=> [$b['uri'], $b['label']]);
+
+        $events = [];
+
+        foreach ($graph->nodesOfType(NodeType::Event) as $node) {
+            $listeners = [];
+            $queued = 0;
+
+            foreach ($graph->outgoingEdges($node->id) as $edge) {
+                $listener = $edge->type === EdgeType::EventHandledByListener ? $graph->node($edge->target) : null;
+
+                if ($listener !== null) {
+                    $listeners[] = $listener->label;
+                    $queued += ($listener->metadata['queued'] ?? false) === true ? 1 : 0;
+                }
+            }
+
+            $events[] = [
+                'id' => $node->id->value,
+                'label' => $node->label,
+                'namespace' => $node->metadata['namespace'] ?? '',
+                'listeners' => implode(', ', $listeners),
+                'queued_listeners' => $queued,
+                'dispatched_by' => implode(', ', $this->dispatcherLabels($graph, $node)),
+                'status' => $node->status->value,
+            ];
+        }
+
+        $dispatches = [];
+
+        foreach ([NodeType::Job, NodeType::Mailable, NodeType::Notification] as $type) {
+            foreach ($graph->nodesOfType($type) as $node) {
+                $dispatches[] = [
+                    'id' => $node->id->value,
+                    'label' => $node->label,
+                    'namespace' => $node->metadata['namespace'] ?? '',
+                    'kind' => $node->type->value,
+                    'queued' => ($node->metadata['queued'] ?? false) === true,
+                    'dispatched_by' => implode(', ', $this->dispatcherLabels($graph, $node)),
+                    'status' => $node->status->value,
+                ];
+            }
+        }
+
+        return [
+            'routes' => $routes,
+            'events' => $this->sortRows($events),
+            'dispatches' => $this->sortRows($dispatches),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dispatcherLabels(Graph $graph, Node $node): array
+    {
+        $labels = [];
+
+        foreach ($graph->incomingEdges($node->id) as $edge) {
+            if ($edge->type === EdgeType::Dispatches) {
+                $labels[] = $graph->node($edge->source)->label ?? $edge->source->value;
+            }
+        }
+
+        $labels = array_values(array_unique($labels));
+        sort($labels, SORT_STRING);
+
+        return $labels;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function stringMap(mixed $values): array
+    {
+        $map = [];
+
+        foreach (is_array($values) ? $values : [] as $key => $value) {
+            if (is_string($value)) {
+                $map[(string) $key] = $value;
+            }
+        }
+
+        return $map;
     }
 
     /**
@@ -993,6 +1272,58 @@ class DependencyGraphPage extends Page implements HasTable
         return (bool) $this->configRepository()->get('filament-dependency-graph.laravel_scope_enabled', true);
     }
 
+    public function isHttpScopeAllowed(): bool
+    {
+        return (bool) $this->configRepository()->get('filament-dependency-graph.http.enabled', true);
+    }
+
+    public function isHttpScope(): bool
+    {
+        return $this->currentScope() === GraphScope::Http;
+    }
+
+    /**
+     * Middleware names used by the routes of the HTTP scope.
+     *
+     * @return list<string>
+     */
+    public function getMiddlewareOptions(): array
+    {
+        if (! $this->isHttpScope()) {
+            return [];
+        }
+
+        try {
+            $graph = $this->searchableGraph();
+        } catch (Throwable) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach ($graph->nodesOfType(NodeType::Route) as $route) {
+            // What the developer wrote, even a class name...
+            foreach ($this->stringMap($route->metadata['middleware'] ?? []) as $name) {
+                $names[explode(':', $name, 2)[0]] = true;
+            }
+
+            // ...plus the aliases and group names the resolution adds, but
+            // not the resolved class names, which would only add noise.
+            foreach ($this->stringMap($route->metadata['resolved_middleware'] ?? []) as $name) {
+                if (! str_contains($name, '\\')) {
+                    $names[explode(':', $name, 2)[0]] = true;
+                }
+            }
+
+            unset($names['Closure']);
+        }
+
+        $names = array_keys($names);
+        sort($names, SORT_STRING);
+
+        return $names;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -1000,8 +1331,16 @@ class DependencyGraphPage extends Page implements HasTable
     {
         $options = [];
 
+        $http = $this->isHttpScope();
+
         foreach (NodeType::cases() as $type) {
-            $options[$type->value] = __('filament-dependency-graph::graph.node_types.' . $type->value);
+            $relevant = $http
+                ? $type->isHttp() || $type === NodeType::Model || $type === NodeType::LivewireComponent
+                : ! $type->isHttp();
+
+            if ($relevant) {
+                $options[$type->value] = __('filament-dependency-graph::graph.node_types.' . $type->value);
+            }
         }
 
         return $options;
@@ -1021,13 +1360,20 @@ class DependencyGraphPage extends Page implements HasTable
         return $options;
     }
 
-    protected function graphQuery(): GraphQuery
+    protected function currentScope(): GraphScope
     {
         $scope = GraphScope::tryFrom($this->scope) ?? GraphScope::Filament;
 
-        if ($scope === GraphScope::Laravel && ! $this->isLaravelScopeAllowed()) {
-            $scope = GraphScope::Filament;
-        }
+        return match (true) {
+            $scope === GraphScope::Laravel && ! $this->isLaravelScopeAllowed(),
+            $scope === GraphScope::Http && ! $this->isHttpScopeAllowed() => GraphScope::Filament,
+            default => $scope,
+        };
+    }
+
+    protected function graphQuery(): GraphQuery
+    {
+        $scope = $this->currentScope();
 
         $nodeTypes = [];
 
@@ -1058,6 +1404,7 @@ class DependencyGraphPage extends Page implements HasTable
             depth: $this->depth,
             direction: TraversalDirection::tryFrom($this->direction) ?? TraversalDirection::Both,
             includeOrphans: $this->showOrphans || $this->onlyOrphans,
+            middleware: $scope === GraphScope::Http && $this->middlewareFilter !== '' ? $this->middlewareFilter : null,
         );
     }
 
@@ -1082,10 +1429,8 @@ class DependencyGraphPage extends Page implements HasTable
             return $this->memoizedSearchGraph;
         }
 
-        $scope = GraphScope::tryFrom($this->scope) ?? GraphScope::Filament;
-
         return $this->memoizedSearchGraph = $this->manager()->graph(new GraphQuery(
-            scope: $scope,
+            scope: $this->currentScope(),
             panelIds: $this->panelFilter,
         ));
     }
@@ -1153,11 +1498,123 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
+     * Routes grouped by their first URI segment, followed by the events that
+     * nothing in the application dispatches.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function httpTree(Graph $graph, int $maxDepth): array
+    {
+        $groups = [];
+
+        foreach ($graph->nodesOfType(NodeType::Route) as $route) {
+            $uri = $route->metadata['uri'] ?? '';
+            $segment = '/' . explode('/', trim(is_string($uri) ? $uri : '', '/'))[0];
+            $groups[$segment][] = $route;
+        }
+
+        ksort($groups, SORT_STRING);
+
+        $tree = [];
+
+        foreach ($groups as $segment => $routes) {
+            usort($routes, static fn (Node $a, Node $b): int => [$a->metadata['uri'] ?? '', $a->label] <=> [$b->metadata['uri'] ?? '', $b->label]);
+
+            $tree[] = $this->treeGroup('group:' . $segment, $segment, $graph, $routes, $maxDepth);
+        }
+
+        $undispatched = array_values(array_filter(
+            $graph->nodesOfType(NodeType::Event),
+            static fn (Node $event): bool => in_array('No dispatcher found', $event->badges, true),
+        ));
+
+        if ($undispatched !== []) {
+            $tree[] = $this->treeGroup(
+                'group:undispatched-events',
+                __('filament-dependency-graph::graph.tree.undispatched_events'),
+                $graph,
+                $undispatched,
+                $maxDepth,
+            );
+        }
+
+        return $tree;
+    }
+
+    /**
+     * The HTTP tree reads like one request: model relations are left to the
+     * other scopes, and below a controller only the edges of the action the
+     * route calls are followed.
+     */
+    protected function httpTreeFilter(Graph $graph, Node $root): Closure
+    {
+        $action = null;
+
+        foreach ($graph->outgoingEdges($root->id) as $edge) {
+            if ($edge->type === EdgeType::RouteHandledByController) {
+                $action = $edge->label;
+            }
+        }
+
+        return static function (Edge $edge) use ($graph, $action): bool|string {
+            if ($edge->type === EdgeType::ModelRelation) {
+                return false;
+            }
+
+            if ($action === null || $graph->node($edge->source)?->type !== NodeType::Controller) {
+                return true;
+            }
+
+            $methods = $edge->metadata['methods'] ?? null;
+
+            if (is_array($methods) && ! in_array($action, $methods, true)) {
+                return false;
+            }
+
+            // Requests and models are labelled with every action using
+            // them; under one route, only that route's action matters.
+            return in_array($edge->type, [EdgeType::ControllerValidatesWith, EdgeType::ControllerUsesModel], true)
+                ? $action
+                : true;
+        };
+    }
+
+    /**
+     * @param  list<Node>  $nodes
+     * @return array<string, mixed>
+     */
+    protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth): array
+    {
+        $children = [];
+
+        foreach ($nodes as $node) {
+            $visited = [];
+            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited, $this->httpTreeFilter($graph, $node));
+        }
+
+        return [
+            'id' => $id,
+            'label' => $label,
+            'type' => 'group',
+            'relation' => null,
+            'already_shown' => false,
+            'children' => array_values(array_filter($children)),
+        ];
+    }
+
+    /**
      * @param  array<string, true>  $visited
+     * @param  (Closure(Edge): (bool|string))|null  $follow  False skips an edge, a string replaces its branch label.
      * @return array<string, mixed>|null
      */
-    protected function treeNode(Graph $graph, string $nodeId, ?string $viaRelation, int $remainingDepth, array &$visited): ?array
-    {
+    protected function treeNode(
+        Graph $graph,
+        string $nodeId,
+        ?string $viaRelation,
+        int $remainingDepth,
+        array &$visited,
+        ?Closure $follow = null,
+    ): ?array {
         $node = $graph->node($nodeId);
 
         if ($node === null) {
@@ -1184,19 +1641,26 @@ class DependencyGraphPage extends Page implements HasTable
         $children = [];
 
         foreach ($graph->outgoingEdges($nodeId) as $edge) {
+            $decision = $follow === null ? true : $follow($edge);
+
+            if ($decision === false) {
+                continue;
+            }
+
+            $relation = is_string($decision) ? $decision : $edge->label;
             $childLabel = $graph->node($edge->target)->label ?? '';
 
             $children[] = [
-                'sort' => [$edge->label, $childLabel, $edge->type->value],
+                'sort' => [$relation, $childLabel, $edge->type->value],
                 'target' => $edge->target->value,
-                'relation' => $edge->label,
+                'relation' => $relation,
             ];
         }
 
         usort($children, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         foreach ($children as $child) {
-            $childNode = $this->treeNode($graph, $child['target'], $child['relation'], $remainingDepth - 1, $visited);
+            $childNode = $this->treeNode($graph, $child['target'], $child['relation'], $remainingDepth - 1, $visited, $follow);
 
             if ($childNode !== null) {
                 $item['children'][] = $childNode;

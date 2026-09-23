@@ -1,15 +1,17 @@
-# Filament Dependency Graph
+<h1 class="filament-hidden">Filament Dependency Graph</h1>
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://packagist.org/packages/laboiteacode/filament-dependency-graph)
 [![Tests](https://img.shields.io/github/actions/workflow/status/la-boite-a-code/filament-dependency-graph/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/la-boite-a-code/filament-dependency-graph/actions/workflows/tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://packagist.org/packages/laboiteacode/filament-dependency-graph)
-[![License](https://img.shields.io/packagist/l/laboiteacode/filament-dependency-graph.svg?style=flat-square)](LICENSE.md)
+[![License](https://img.shields.io/packagist/l/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/LICENSE.md)
 
 > The visual architecture explorer for Filament.
 
-Explore models, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
+Explore models, routes, controllers, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
 
-![Filament Dependency Graph](art/banner.jpg)
+<p class="filament-hidden">
+    <img src="https://raw.githubusercontent.com/La-boite-a-code/Filament-Dependency-Graph/main/art/banner.jpg" alt="Filament Dependency Graph">
+</p>
 
 ## The problem
 
@@ -26,19 +28,22 @@ Install the package, register the plugin, open one page, and immediately answer:
 - Which models have no resource? Which are isolated?
 - Where do circular dependencies exist?
 - What surrounds this specific model?
+- Which controller, form request and models does this route reach?
+- What does this action dispatch, and who listens to it?
 
 ## Features
 
 - **Automatic discovery.** Eloquent models and relations, application Livewire components, Filament panels, resources, pages and relation managers, with zero package-specific configuration on standard applications.
 - **Project-wide Livewire visibility.** Components under `app/Livewire` or the legacy `app/Http/Livewire` convention appear in the Laravel scope even when they are not registered in a Filament panel. Typed properties, method signatures and explicit static model references become component-to-model dependencies without instantiating the component.
+- **HTTP map.** A dedicated scope maps every application route to its controller action, form request, route-bound and referenced models, their policies, and the events, jobs, mailables and notifications dispatched along the way, including one level into injected action or service classes. Listeners come from the event dispatcher, so Laravel's event discovery is covered. Nothing is executed to build it.
 - **Every Eloquent relation type.** belongsTo, hasOne, hasMany, belongsToMany, hasOneThrough, hasManyThrough, morphTo, morphOne, morphMany, morphToMany and morphedByMany, including morph maps.
 - **A readable graph.** Cytoscape.js with a layered dagre layout for the hierarchical mode and fCoSE for the force-directed mode. Relation labels only appear at readable zoom levels, selecting a node fades everything outside its neighborhood, and disconnected models are packed neatly instead of drifting over the graph.
 - **Native Filament look.** The whole page is built from Filament components (sections, tabs, buttons, selects, checkboxes, badges) and the graph palette reads your panel color scales at runtime, in light and dark mode.
 - **Tree and table views** for the same data, usable without the graph renderer.
-- **Contextual inspector** for models, Livewire components, resources, panels and relation edges: keys, pivot tables, morph metadata, traits, casts, rendered views, public APIs and diagnostics.
-- **Search** across class names, labels, tables, namespaces, panels and relation methods, with deterministic ranking.
+- **Contextual inspector** for models, Livewire components, resources, panels, routes, controllers, form requests, policies, events, listeners, dispatched classes and every edge: keys, pivot tables, morph metadata, traits, casts, rendered views, public APIs, middleware, validation rules, dispatch locations and diagnostics.
+- **Search** across class names, labels, tables, namespaces, panels, relation methods, route URIs and route names, with deterministic ranking.
 - **Focus mode** with configurable depth and direction, shareable through the URL query string.
-- **Filters.** Panels, node types, relation types, namespace, vendor or application ownership, orphans only, circular dependencies only, models without resources only.
+- **Filters.** Panels, node types, relation types, namespace, vendor or application ownership, orphans only, circular dependencies only, models without resources only, and routes with or without a given middleware in the HTTP scope.
 - **Deterministic JSON and Mermaid exports**, from the UI or the CLI.
 - **Snapshot cache** with dedicated artisan commands.
 - **Full page customization.** Navigation label, icon, group, sort, badge, parent item, slug, cluster, max content width and access control - fluently or from the configuration file.
@@ -92,7 +97,7 @@ DependencyGraphPlugin::make()
 
 ### Graph view
 
-The default view renders the dependency graph with typed nodes: panels, resource hexagons, Livewire components, model boxes and dashed polymorphic-target diamonds. Two layouts are available from the toolbar:
+The default view renders the dependency graph with typed nodes: panels, resource hexagons, Livewire components, model boxes and dashed polymorphic-target diamonds. The HTTP scope adds route tags, controllers, form requests, policy octagons, event rhomboids, dashed listeners and green hexagons for jobs, mailables and notifications, with controller methods and dispatch kinds on the edges. Two layouts are available from the toolbar:
 
 - **Hierarchical** (default) - a layered dagre layout: panels on top, then resources, then models, with crossing minimisation.
 - **Force-directed** - fCoSE, which clusters tightly related models together and packs disconnected components side by side.
@@ -103,9 +108,11 @@ Interactions: zoom and pan, drag nodes, click a node or an edge to open the nati
 
 A cycle-safe, depth-limited expansion of the graph starting from the panels (or from the selected node), with the relation method displayed on every branch. Useful for answering "what hangs off this model" linearly.
 
+In the HTTP scope the tree starts from the routes, grouped by their first URI segment (`/orders`, `/account`...), and reads like a request: route, controller method, form request, models, dispatches, listeners. Events that nothing in the application dispatches are listed in their own group.
+
 ### Table view
 
-A native Filament Table exposes four inventory categories - models, relations, Livewire components and resources - through compact tabs. Search, sorting, pagination, column visibility and empty states follow the panel behavior automatically. Counts, aliases, views, foreign keys, pivot tables, navigation groups and discovery status remain available, and every row opens the inspector.
+A native Filament Table exposes four inventory categories - models, relations, Livewire components and resources - through compact tabs. The HTTP scope swaps them for routes (action, middleware, form requests, models), events (listeners, queued listeners, dispatchers) and dispatched classes (kind, queue, dispatchers), next to the models. Search, sorting, pagination, column visibility and empty states follow the panel behavior automatically. Counts, aliases, views, foreign keys, pivot tables, navigation groups and discovery status remain available, and every row opens the inspector.
 
 ### Inspector
 
@@ -136,6 +143,38 @@ Press `/` and type: the search matches class names, labels, table names, namespa
 
 - **Filament scope** (default): starts from the resources registered in the selected panels and includes their models plus related models up to the configured depth.
 - **Laravel scope**: every discovered Eloquent model and standalone Livewire component, including models that no resource exposes. Disable it entirely with `laravel_scope_enabled => false` or `->allowLaravelScope(false)`.
+- **HTTP scope**: the application routes and everything they lead to - see [HTTP map](#http-map). Disable it, and its discovery, with `http.enabled => false` or `->allowHttpScope(false)`.
+
+## HTTP map
+
+The HTTP scope answers "what happens when this URL is called?" without running a single request.
+
+| Node | Where it comes from |
+| ---- | ------------------- |
+| Route | The router. Application routes only: controllers under `http.controller_namespaces`, closures defined outside `vendor/`, view and redirect routes, and full-page Livewire components. |
+| Controller | The routes pointing to it. One node per class; each routed method appears on the edges and in the inspector. |
+| Form request | Action parameters typed with a `FormRequest`. Rules are read only when `http.form_request_rules` is enabled. |
+| Model | Route model binding, typed action parameters, and static references such as `Order::query()` in the action. |
+| Policy | Registered policies, the `#[UsePolicy]` attribute, then Laravel's naming convention - including a custom `Gate::guessPolicyNamesUsing()` callback, which is called to compute the name. Policies are never instantiated. |
+| Event, listener | The event dispatcher's listener map, which includes Laravel's event discovery. Listeners outside `http.application_namespaces` are ignored. |
+| Job, mailable, notification | `X::dispatch()`, `X::broadcast()` and `new X` in controller actions, listeners and job `handle()` methods, classified by their type (`Mailable`, `Notification`, event, `ShouldQueue` or bus `Dispatchable`). |
+
+Calls on injected application classes are followed **one level deep**: when `store()` calls `$placeOrder->execute()` on a typed parameter or `$this->orders->archive()` on a promoted property, the called method is read as well and its dispatches are attributed to the controller with a `via` note. Every dispatch keeps its `file:line` location in the inspector.
+
+Route middleware combines the route definition with the framework's controller attributes (`#[Middleware]`, `#[Authorize]`, `#[WithoutMiddleware]` on Laravel 13, including on full-page Livewire components). The router then resolves it exactly as it would for a request - aliases, nested groups, and exclusions however they are written - and every alias or group name leading to an effective middleware is kept, so the explorer's **middleware filter** is reliable: "Routes using auth" keeps the routes whose middleware includes `auth` (directly, with parameters such as `auth:sanctum`, through a group or as its class) and what they reach, "Routes without auth" the others. The traversal is action-aware: a controller reached from `index` does not drag in what `store` dispatches; the tree view follows the same rule.
+
+### Detection limits
+
+Everything above comes from registries, reflection and a token-level reading of the source. What cannot be known that way is left out rather than guessed:
+
+- explicit bindings registered with `Route::bind()` or `Route::model()`;
+- classes built dynamically (`new $class`, `app($name)`, `dispatch($job)` on an untyped variable);
+- dispatches more than one collaborator away from the action, listener or job;
+- middleware returned by a controller's static `middleware()` method (`HasMiddleware`), and application subclasses of the middleware attributes: only the framework's own attributes are read;
+- closure routes restored from the route cache: their file is unknown, so they are skipped with a warning unless `http.include_vendor_routes` is enabled (the framework's own `/up` health route is one of them);
+- several namespaces declared in one file: imports are read for the file as a whole.
+
+Events without any dispatch found in controllers, listeners or jobs carry a `No dispatcher found` badge. Livewire components, console commands, observers and Filament actions are not scanned, so the event may be dispatched from there - or be dead code.
 
 ## Configuration
 
@@ -203,6 +242,24 @@ return [
         ],
     ],
 
+    // HTTP map: routes, controllers, form requests, policies, events,
+    // listeners and dispatched jobs, mailables and notifications.
+    'http' => [
+        'enabled' => true,                // also shows or hides the HTTP scope
+        'controller_namespaces' => ['App\\Http\\Controllers\\'],
+        // Listeners, jobs, events and injected classes followed one level.
+        'application_namespaces' => ['App\\'],
+        'include_vendor_routes' => false,
+        'exclude' => [
+            'names' => [],                // Str::is() patterns, e.g. 'horizon.*'
+            'uris' => [],                 // Str::is() patterns, e.g. '_debugbar/*'
+        ],
+        'follow_injected_classes' => true,
+        // Calls FormRequest::rules() outside of a request. Disabled by
+        // default: rules may depend on the request or the database.
+        'form_request_rules' => false,
+    ],
+
     // Discovery behavior.
     'discovery' => [
         'relations' => true,
@@ -251,6 +308,7 @@ DependencyGraphPlugin::make()
     ->defaultScope(GraphScope::Filament)
     ->defaultDepth(2)
     ->allowLaravelScope()
+    ->allowHttpScope()
     ->scanVendorModels(false)
     ->scanLivewireComponents()
     ->excludeModels([AuditLog::class])
@@ -315,8 +373,9 @@ From the CLI:
 ```bash
 php artisan filament-dependency-graph:export
     {--format=json : Export format, json or mermaid}
-    {--scope= : Graph scope, filament or laravel}
+    {--scope= : Graph scope, filament, laravel or http}
     {--panel=* : Only include the given panel ids}
+    {--middleware= : HTTP scope only: keep routes using a middleware (auth) or not using it (!auth)}
     {--focus= : Focus on a node id, for example model:app.models.order}
     {--depth= : Focus traversal depth}
     {--direction=both : Focus direction, incoming, outgoing or both}
@@ -342,7 +401,7 @@ Discovery relies on reflection and file scanning, so snapshots are cached. The c
 ```bash
 # Warm the cache, for example in a deploy pipeline
 php artisan filament-dependency-graph:cache
-    {--scope= : Discovery scope, filament or laravel}
+    {--scope= : Discovery scope, filament, laravel or http}
     {--panel=* : Only discover the given panel ids}
     {--no-schema : Skip database schema inspection}
     {--force : Rebuild even when a cached snapshot exists}
@@ -363,7 +422,7 @@ use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 use LaBoiteACode\DependencyGraph\Facades\DependencyGraph;
 
 // Raw discovery snapshot: models, relations, Livewire components, panels,
-// resources and warnings.
+// resources, the HTTP map ($snapshot->http) and warnings.
 $snapshot = DependencyGraph::discover();
 
 // Full graph with the default query.
@@ -386,9 +445,15 @@ $json = DependencyGraph::export('json');
 $mermaid = DependencyGraph::export('mermaid');
 
 DependencyGraph::clearCache();
+
+// Routes protected by auth, and what they lead to.
+$graph = DependencyGraph::graph(new GraphQuery(
+    scope: GraphScope::Http,
+    middleware: 'auth',          // '!auth' for the routes without it
+));
 ```
 
-`GraphQuery` accepts the scope, panel ids, node types, relation types, a focus node with depth and direction, and whether orphans are included - the same capabilities as the UI filters.
+`GraphQuery` accepts the scope, panel ids, node types, relation types, a focus node with depth and direction, whether orphans are included and, in the HTTP scope, a middleware filter - the same capabilities as the UI filters.
 
 ## Extending
 
@@ -438,6 +503,8 @@ DependencyGraphPlugin::make()
 - **Some models are missing.** Discovery scans `model_paths` and `model_namespaces`; add your custom locations there or with `registerModelPath()` / `registerModelNamespace()`. Vendor models are excluded unless `vendor_models.enabled` is true.
 - **A Livewire component is missing.** Add its source directory and namespace under `livewire.paths` / `livewire.namespaces`, or use `registerLivewirePath()` / `registerLivewireNamespace()`. Components are visible in the Laravel scope, not the Filament scope.
 - **A Livewire-to-model link is missing.** The read-only scanner recognizes model types on component properties and methods, plus explicit static references such as `Order::query()`. Dynamic container resolution and untyped variables cannot be inferred safely.
+- **A route is missing from the HTTP scope.** Only application routes are mapped: check that its controller lives under `http.controller_namespaces`, that it is not excluded by `http.exclude`, or enable `http.include_vendor_routes` for package routes.
+- **A dispatch or a model is missing on a controller.** The scanner reads the action and one level of typed, injected application classes. Move the class under `http.application_namespaces`, type the collaborator, or accept that dynamic calls are out of reach (see [Detection limits](#detection-limits)).
 - **A relation is not detected.** Untyped relation methods are only discovered through docblocks (enabled by default) or heuristic invocation (disabled by default, because it calls the methods). Add a return type to the relation method for the most reliable detection.
 - **A model shows a warning badge.** Discovery is resilient: the inspector's diagnostics section lists exactly what failed for that class.
 
@@ -453,15 +520,15 @@ The suite runs on Pest with Orchestra Testbench against a realistic fixture doma
 
 ## Architecture
 
-The codebase is layered: a framework-agnostic domain (graph model, DTOs, algorithms), an application layer (use cases), infrastructure (discovery, cache, exporters) and a Filament presentation layer. Filament 4 and 5 differences are isolated behind a compatibility adapter. Architecture decision records live in [docs/adr](docs/adr).
+The codebase is layered: a framework-agnostic domain (graph model, DTOs, algorithms), an application layer (use cases), infrastructure (discovery, cache, exporters) and a Filament presentation layer. Filament 4 and 5 differences are isolated behind a compatibility adapter. Architecture decision records live in [docs/adr](https://github.com/La-boite-a-code/Filament-Dependency-Graph/tree/main/docs/adr).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/CHANGELOG.md) for release notes.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/CONTRIBUTING.md). Please report security issues privately as described in [SECURITY.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/SECURITY.md).
 
 ## Credits
 
@@ -472,4 +539,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately 
 
 ## License
 
-Open source under the [MIT license](LICENSE.md).
+Open source under the [MIT license](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/LICENSE.md).

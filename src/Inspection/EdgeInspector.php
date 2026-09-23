@@ -61,6 +61,15 @@ final class EdgeInspector
             ]);
         }
 
+        if (! in_array($edge->type, [
+            EdgeType::ModelRelation,
+            EdgeType::LivewireUsesModel,
+            EdgeType::PanelRegistersResource,
+            EdgeType::ResourceUsesModel,
+        ], true)) {
+            $sections[] = $this->httpDetails($edge);
+        }
+
         $warnings = $edge->metadata['warnings'] ?? [];
 
         $sections[] = new InspectionSection('diagnostics', 'Diagnostics', [
@@ -78,6 +87,30 @@ final class EdgeInspector
             subtitle: sprintf('%s to %s', $source->label ?? '?', $target->label ?? '?'),
             sections: $sections,
         );
+    }
+
+    private function httpDetails(Edge $edge): InspectionSection
+    {
+        $entries = ['Type' => str_replace('_', ' ', $edge->type->value)];
+
+        foreach (['methods' => 'Methods', 'sources' => 'Sources', 'via' => 'Via', 'locations' => 'Locations'] as $key => $label) {
+            $values = $edge->metadata[$key] ?? [];
+            $values = array_values(array_filter(is_array($values) ? $values : [], 'is_string'));
+
+            if ($values !== []) {
+                $entries[$label] = $values;
+            }
+        }
+
+        foreach (['kind' => 'Kind', 'method' => 'Method', 'source' => 'Resolved by', 'confidence' => 'Detection'] as $key => $label) {
+            $value = $this->string($edge, $key);
+
+            if ($value !== null) {
+                $entries[$label] = $value;
+            }
+        }
+
+        return new InspectionSection('http', 'Details', $entries);
     }
 
     private function string(Edge $edge, string $key): ?string

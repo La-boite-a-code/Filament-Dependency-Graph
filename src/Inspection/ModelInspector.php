@@ -27,15 +27,16 @@ final class ModelInspector implements NodeInspector
             subjectType: $node->type->value,
             title: $node->label,
             subtitle: $node->subtitle,
-            sections: [
+            sections: array_values(array_filter([
                 $this->identity($node),
                 $this->filamentUsage($node, $graph),
                 $this->livewireUsage($node, $graph),
+                $this->httpUsage($node, $graph),
                 $this->relationships($node, $graph),
                 $this->database($node),
                 $this->behavior($node),
                 $this->diagnostics($node),
-            ],
+            ])),
         );
     }
 
@@ -60,6 +61,59 @@ final class ModelInspector implements NodeInspector
 
         return new InspectionSection('livewire', 'Livewire usage', [
             'Components' => $components,
+        ]);
+    }
+
+    /**
+     * Only present when the graph contains the HTTP map.
+     */
+    private function httpUsage(Node $node, Graph $graph): ?InspectionSection
+    {
+        $class = $this->string($node, 'class');
+        $controllers = [];
+        $routes = [];
+        $policies = [];
+
+        foreach ($graph->incomingEdges($node->id) as $edge) {
+            if ($edge->type !== EdgeType::ControllerUsesModel) {
+                continue;
+            }
+
+            $sources = $edge->metadata['sources'] ?? [];
+
+            $controllers[] = sprintf(
+                '%s@%s (%s)',
+                $graph->node($edge->source)->label ?? $edge->source->value,
+                $edge->label,
+                implode(', ', array_map('strval', is_array($sources) ? $sources : [])),
+            );
+        }
+
+        foreach ($graph->outgoingEdges($node->id) as $edge) {
+            if ($edge->type === EdgeType::ModelGuardedByPolicy) {
+                $policies[] = $graph->node($edge->target)->label ?? $edge->target->value;
+            }
+        }
+
+        foreach ($graph->nodesOfType(NodeType::Route) as $route) {
+            $bound = $route->metadata['bound_parameters'] ?? [];
+
+            if ($class !== null && is_array($bound) && in_array($class, $bound, true)) {
+                $routes[] = $route->label;
+            }
+        }
+
+        if ($controllers === [] && $routes === [] && $policies === []) {
+            return null;
+        }
+
+        sort($controllers, SORT_STRING);
+        sort($routes, SORT_STRING);
+
+        return new InspectionSection('http', 'HTTP usage', [
+            'Routes binding it' => $routes,
+            'Controllers' => $controllers,
+            'Policy' => $policies,
         ]);
     }
 

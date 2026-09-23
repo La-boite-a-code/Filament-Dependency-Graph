@@ -25,6 +25,10 @@ final readonly class DiscoveryContext
      * @param  list<string>  $livewirePaths
      * @param  list<string>  $livewireNamespaces
      * @param  list<string>  $panelIds  Empty list means every registered panel.
+     * @param  list<string>  $httpControllerNamespaces
+     * @param  list<string>  $httpApplicationNamespaces
+     * @param  list<string>  $excludedRouteNames  Str::is() patterns.
+     * @param  list<string>  $excludedRouteUris  Str::is() patterns.
      */
     public function __construct(
         public GraphScope $scope = GraphScope::Filament,
@@ -46,6 +50,14 @@ final readonly class DiscoveryContext
         public array $panelIds = [],
         public string $basePath = '',
         public string $vendorPath = '',
+        public bool $discoverHttp = true,
+        public array $httpControllerNamespaces = [],
+        public array $httpApplicationNamespaces = [],
+        public bool $includeVendorRoutes = false,
+        public array $excludedRouteNames = [],
+        public array $excludedRouteUris = [],
+        public bool $followInjectedClasses = true,
+        public bool $invokeFormRequestRules = false,
     ) {}
 
     public function withScope(GraphScope $scope): self
@@ -93,6 +105,14 @@ final readonly class DiscoveryContext
             'panel_ids' => $this->panelIds,
             'base_path' => $this->basePath,
             'vendor_path' => $this->vendorPath,
+            'discover_http' => $this->discoverHttp,
+            'http_controller_namespaces' => $this->httpControllerNamespaces,
+            'http_application_namespaces' => $this->httpApplicationNamespaces,
+            'include_vendor_routes' => $this->includeVendorRoutes,
+            'excluded_route_names' => $this->excludedRouteNames,
+            'excluded_route_uris' => $this->excludedRouteUris,
+            'follow_injected_classes' => $this->followInjectedClasses,
+            'invoke_form_request_rules' => $this->invokeFormRequestRules,
         ];
     }
 
@@ -124,6 +144,14 @@ final readonly class DiscoveryContext
             panelIds: $panelIds ?? $this->panelIds,
             basePath: $this->basePath,
             vendorPath: $this->vendorPath,
+            discoverHttp: $this->discoverHttp,
+            httpControllerNamespaces: $this->httpControllerNamespaces,
+            httpApplicationNamespaces: $this->httpApplicationNamespaces,
+            includeVendorRoutes: $this->includeVendorRoutes,
+            excludedRouteNames: $this->excludedRouteNames,
+            excludedRouteUris: $this->excludedRouteUris,
+            followInjectedClasses: $this->followInjectedClasses,
+            invokeFormRequestRules: $this->invokeFormRequestRules,
         );
     }
 }

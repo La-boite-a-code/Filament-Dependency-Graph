@@ -91,6 +91,14 @@ final class DiscoverApplication
             panelIds: [],
             basePath: $this->app->basePath(),
             vendorPath: $this->app->basePath('vendor'),
+            discoverHttp: (bool) $this->config->get('filament-dependency-graph.http.enabled', true),
+            httpControllerNamespaces: $this->stringList('http.controller_namespaces', ['App\\Http\\Controllers\\']),
+            httpApplicationNamespaces: $this->stringList('http.application_namespaces', ['App\\']),
+            includeVendorRoutes: (bool) $this->config->get('filament-dependency-graph.http.include_vendor_routes', false),
+            excludedRouteNames: $this->stringList('http.exclude.names'),
+            excludedRouteUris: $this->stringList('http.exclude.uris'),
+            followInjectedClasses: (bool) $this->config->get('filament-dependency-graph.http.follow_injected_classes', true),
+            invokeFormRequestRules: (bool) $this->config->get('filament-dependency-graph.http.form_request_rules', false),
         );
     }
 

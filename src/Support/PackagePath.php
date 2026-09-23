@@ -34,6 +34,19 @@ final class PackagePath
         return $vendorPath === '' || ! self::isInside($path, $vendorPath);
     }
 
+    /**
+     * Path relative to the base path when the file lives inside it,
+     * otherwise the file name alone so absolute paths never leak.
+     */
+    public static function relative(string $path, string $basePath): string
+    {
+        if (self::isInside($path, $basePath)) {
+            return substr(self::normalize($path), strlen(rtrim(self::normalize($basePath), '/')) + 1);
+        }
+
+        return basename(self::normalize($path));
+    }
+
     public static function normalize(string $path): string
     {
         return str_replace('\\', '/', $path);

@@ -11,6 +11,16 @@ use LaBoiteACode\DependencyGraph\Domain\ValueObjects\ExportOptions;
 
 final class MermaidGraphExporter implements GraphExporter
 {
+    /**
+     * Edges whose label carries information: relation methods, controller
+     * methods and dispatch kinds.
+     */
+    private const LABELLED_EDGES = [
+        EdgeType::ModelRelation,
+        EdgeType::RouteHandledByController,
+        EdgeType::Dispatches,
+    ];
+
     private const DIRECTIONS = ['LR', 'RL', 'TB', 'BT'];
 
     public function format(): string
@@ -48,7 +58,7 @@ final class MermaidGraphExporter implements GraphExporter
             $source = $this->identifier($edge->source->value);
             $target = $this->identifier($edge->target->value);
 
-            if ($options->includeEdgeLabels && $edge->type === EdgeType::ModelRelation && $edge->label !== '') {
+            if ($options->includeEdgeLabels && in_array($edge->type, self::LABELLED_EDGES, true) && $edge->label !== '') {
                 $lines[] = sprintf('    %s -- %s --> %s', $source, $this->escapeEdgeLabel($edge->label), $target);
             } else {
                 $lines[] = sprintf('    %s --> %s', $source, $target);

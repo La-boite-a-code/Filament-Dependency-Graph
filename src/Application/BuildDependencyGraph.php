@@ -42,14 +42,16 @@ final class BuildDependencyGraph
         $graph = $this->filterRelationTypes($graph, $query);
         $graph = $this->filterPanels($graph, $query);
 
-        if ($query->scope === GraphScope::Filament) {
-            $graph = $this->restrictToFilamentScope($graph);
-        }
+        $graph = match ($query->scope) {
+            GraphScope::Filament => $this->restrictToFilamentScope($graph),
+            GraphScope::Laravel => $this->withoutHttpNodes($graph),
+            GraphScope::Http => $this->restrictToHttpScope($graph, $query->middleware),
+        };
 
         $graph = $this->filterNodeTypes($graph, $query);
 
         if (! $query->includeOrphans) {
-            $graph = $this->withoutOrphans($graph);
+            $graph = $this->withoutOrphans($graph, $query->scope);
         }
 
         if ($query->hasFocus() && $query->focusNodeId !== null && $graph->hasNode($query->focusNodeId)) {
@@ -193,6 +195,125 @@ final class BuildDependencyGraph
         return $graph->subgraph(array_keys($keep));
     }
 
+    /**
+     * The Laravel scope keeps its historical content: models, relations,
+     * resources and Livewire components, without the HTTP map.
+     */
+    private function withoutHttpNodes(Graph $graph): Graph
+    {
+        $nodeIds = [];
+
+        foreach ($graph->nodes as $node) {
+            if (! $node->type->isHttp()) {
+                $nodeIds[] = $node->id->value;
+            }
+        }
+
+        return $graph->subgraph($nodeIds);
+    }
+
+    /**
+     * The HTTP scope starts from the routes and follows what they lead to:
+     * controllers, form requests, models and their policies, dispatches,
+     * events and listeners. Events and listeners are shown even when no
+     * dispatcher was found, unless routes are filtered by middleware.
+     */
+    private function restrictToHttpScope(Graph $graph, ?string $middleware): Graph
+    {
+        $followed = [
+            EdgeType::RouteHandledByController,
+            EdgeType::RouteRendersLivewire,
+            EdgeType::ControllerValidatesWith,
+            EdgeType::ControllerUsesModel,
+            EdgeType::LivewireUsesModel,
+            EdgeType::ModelGuardedByPolicy,
+            EdgeType::Dispatches,
+            EdgeType::EventHandledByListener,
+        ];
+
+        $middleware = $middleware === null || trim($middleware) === '' ? null : trim($middleware);
+        $queue = [];
+
+        foreach ($graph->nodes as $node) {
+            $isSeed = match ($node->type) {
+                NodeType::Route => $middleware === null || $this->matchesMiddleware($node, $middleware),
+                NodeType::Event, NodeType::Listener => $middleware === null,
+                default => false,
+            };
+
+            if ($isSeed) {
+                $queue[] = $node->id->value;
+            }
+        }
+
+        $keep = array_fill_keys($queue, true);
+
+        // A controller node stands for all its actions: from a controller,
+        // only the edges of actions reached by a kept route are followed.
+        // Routes are seeded first, so every route is expanded before any
+        // controller is.
+        $routedMethods = [];
+
+        for ($cursor = 0; $cursor < count($queue); $cursor++) {
+            $currentId = $queue[$cursor];
+
+            foreach ($graph->outgoingEdges($currentId) as $edge) {
+                if (! in_array($edge->type, $followed, true)) {
+                    continue;
+                }
+
+                if ($edge->type === EdgeType::RouteHandledByController) {
+                    $routedMethods[$edge->target->value][] = $edge->label;
+                }
+
+                if (isset($routedMethods[$currentId]) && ! $this->isRoutedEdge($edge, $routedMethods[$currentId])) {
+                    continue;
+                }
+
+                if (isset($keep[$edge->target->value])) {
+                    continue;
+                }
+
+                $keep[$edge->target->value] = true;
+                $queue[] = $edge->target->value;
+            }
+        }
+
+        return $graph->subgraph(array_keys($keep));
+    }
+
+    /**
+     * @param  list<string>  $routedMethods
+     */
+    private function isRoutedEdge(Edge $edge, array $routedMethods): bool
+    {
+        $methods = $edge->metadata['methods'] ?? null;
+
+        return ! is_array($methods) || array_intersect($methods, $routedMethods) !== [];
+    }
+
+    /**
+     * "auth" keeps routes using the auth middleware (with or without
+     * parameters), "!auth" keeps the routes that do not.
+     */
+    private function matchesMiddleware(Node $route, string $filter): bool
+    {
+        $negated = str_starts_with($filter, '!');
+        $name = ltrim($filter, '!');
+        $middleware = $route->metadata['resolved_middleware'] ?? $route->metadata['middleware'] ?? [];
+        $found = false;
+
+        foreach (is_array($middleware) ? $middleware : [] as $entry) {
+            if (is_string($entry) && ($entry === $name || str_starts_with($entry, $name . ':'))) {
+                $found = true;
+
+                break;
+            }
+        }
+
+        return $negated ? ! $found : $found;
+    }
+
     private function filterNodeTypes(Graph $graph, GraphQuery $query): Graph
     {
         if ($query->nodeTypes === []) {
@@ -210,9 +331,19 @@ final class BuildDependencyGraph
         return $graph->subgraph($nodeIds);
     }
 
-    private function withoutOrphans(Graph $graph): Graph
+    /**
+     * In the HTTP scope a model used by a controller is connected: hiding
+     * orphans must not hide what the routes lead to.
+     */
+    private function withoutOrphans(Graph $graph, GraphScope $scope): Graph
     {
-        $orphans = array_flip($this->orphans->detect($graph));
+        $usageEdges = [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel];
+
+        if ($scope === GraphScope::Http) {
+            $usageEdges[] = EdgeType::ControllerUsesModel;
+        }
+
+        $orphans = array_flip($this->orphans->detect($graph, $usageEdges));
 
         $nodeIds = [];
 
