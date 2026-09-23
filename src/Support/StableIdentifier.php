@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Support;
 
+use LaBoiteACode\DependencyGraph\Domain\Enums\DispatchKind;
 use LaBoiteACode\DependencyGraph\Domain\Enums\EdgeType;
 
 /**
@@ -46,6 +47,56 @@ final class StableIdentifier
     public static function polymorphicTarget(string $sourceClass, string $method): string
     {
         return 'polymorphic:' . self::normalizeClass($sourceClass) . ':' . $method;
+    }
+
+    /**
+     * Routes are identified by what makes them unique in the router: their
+     * methods, domain and URI. Names are optional and may repeat.
+     *
+     * @param  list<string>  $methods
+     */
+    public static function route(array $methods, ?string $domain, string $uri): string
+    {
+        $methods = array_map('strtoupper', $methods);
+        sort($methods, SORT_STRING);
+
+        return 'route:' . implode('|', $methods) . ':' . ($domain ?? '') . '/' . ltrim($uri, '/');
+    }
+
+    public static function controller(string $class): string
+    {
+        return 'controller:' . self::normalizeClass($class);
+    }
+
+    public static function formRequest(string $class): string
+    {
+        return 'form-request:' . self::normalizeClass($class);
+    }
+
+    public static function policy(string $class): string
+    {
+        return 'policy:' . self::normalizeClass($class);
+    }
+
+    public static function event(string $class): string
+    {
+        return 'event:' . self::normalizeClass($class);
+    }
+
+    public static function listener(string $class): string
+    {
+        return 'listener:' . self::normalizeClass($class);
+    }
+
+    /**
+     * Node id of a dispatched class: events share the event identifier,
+     * jobs, mailables and notifications are prefixed with their kind.
+     */
+    public static function dispatchTarget(DispatchKind $kind, string $class): string
+    {
+        return $kind === DispatchKind::Event
+            ? self::event($class)
+            : $kind->value . ':' . self::normalizeClass($class);
     }
 
     public static function edge(EdgeType $type, string $sourceId, string $targetId, ?string $discriminator = null): string
