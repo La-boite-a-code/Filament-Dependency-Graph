@@ -1,15 +1,17 @@
-# Filament Dependency Graph
+<h1 class="filament-hidden">Filament Dependency Graph</h1>
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://packagist.org/packages/laboiteacode/filament-dependency-graph)
 [![Tests](https://img.shields.io/github/actions/workflow/status/la-boite-a-code/filament-dependency-graph/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/la-boite-a-code/filament-dependency-graph/actions/workflows/tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://packagist.org/packages/laboiteacode/filament-dependency-graph)
-[![License](https://img.shields.io/packagist/l/laboiteacode/filament-dependency-graph.svg?style=flat-square)](LICENSE.md)
+[![License](https://img.shields.io/packagist/l/laboiteacode/filament-dependency-graph.svg?style=flat-square)](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/LICENSE.md)
 
 > The visual architecture explorer for Filament.
 
-Explore models, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
+Explore models, routes, controllers, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
 
-![Filament Dependency Graph](art/banner.jpg)
+<p class="filament-hidden">
+    <img src="https://raw.githubusercontent.com/La-boite-a-code/Filament-Dependency-Graph/main/art/banner.jpg" alt="Filament Dependency Graph">
+</p>
 
 ## The problem
 
@@ -518,15 +520,15 @@ The suite runs on Pest with Orchestra Testbench against a realistic fixture doma
 
 ## Architecture
 
-The codebase is layered: a framework-agnostic domain (graph model, DTOs, algorithms), an application layer (use cases), infrastructure (discovery, cache, exporters) and a Filament presentation layer. Filament 4 and 5 differences are isolated behind a compatibility adapter. Architecture decision records live in [docs/adr](docs/adr).
+The codebase is layered: a framework-agnostic domain (graph model, DTOs, algorithms), an application layer (use cases), infrastructure (discovery, cache, exporters) and a Filament presentation layer. Filament 4 and 5 differences are isolated behind a compatibility adapter. Architecture decision records live in [docs/adr](https://github.com/La-boite-a-code/Filament-Dependency-Graph/tree/main/docs/adr).
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/CHANGELOG.md) for release notes.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/CONTRIBUTING.md). Please report security issues privately as described in [SECURITY.md](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/SECURITY.md).
 
 ## Credits
 
@@ -537,4 +539,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately 
 
 ## License
 
-Open source under the [MIT license](LICENSE.md).
+Open source under the [MIT license](https://github.com/La-boite-a-code/Filament-Dependency-Graph/blob/main/LICENSE.md).
