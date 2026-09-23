@@ -32,6 +32,7 @@ use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\PolicyDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\RelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ResourceDiscoverer;
+use LaBoiteACode\DependencyGraph\Contracts\ViewMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\ClassCandidateFinder;
 use LaBoiteACode\DependencyGraph\Discovery\EloquentModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\EloquentRelationDiscoverer;
@@ -45,6 +46,7 @@ use LaBoiteACode\DependencyGraph\Discovery\LivewireComponentDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\ModelInstantiator;
 use LaBoiteACode\DependencyGraph\Discovery\Support\SchemaInspector;
 use LaBoiteACode\DependencyGraph\Discovery\Support\SourceScanner;
+use LaBoiteACode\DependencyGraph\Discovery\Views\LaravelViewMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Domain\Exceptions\InvalidConfigurationException;
 use LaBoiteACode\DependencyGraph\Export\ExportManager;
 use LaBoiteACode\DependencyGraph\Export\JsonGraphExporter;
@@ -102,6 +104,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
         $this->app->singleton(LivewireComponentDiscovererContract::class, LivewireComponentDiscoverer::class);
         $this->app->singleton(HttpMapDiscoverer::class, LaravelHttpMapDiscoverer::class);
         $this->app->singleton(PolicyDiscoverer::class, GatePolicyDiscoverer::class);
+        $this->app->singleton(ViewMapDiscoverer::class, LaravelViewMapDiscoverer::class);
         $this->app->singleton(ApplicationDiscovery::class, LaravelApplicationDiscoverer::class);
         $this->app->singleton(GraphBuilder::class, DefaultGraphBuilder::class);
 

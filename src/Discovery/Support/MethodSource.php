@@ -197,6 +197,26 @@ final readonly class MethodSource
         return $literals;
     }
 
+    /**
+     * String literals returned as is: "return 'filament.pages.reports';".
+     *
+     * @return list<array{name: string, line: int}>
+     */
+    public function returnedStringLiterals(): array
+    {
+        $literals = [];
+
+        foreach ($this->tokens as $index => $token) {
+            $literal = $this->tokens[$index + 1] ?? null;
+
+            if ($token->is(T_RETURN) && $literal !== null && $literal->is(T_CONSTANT_ENCAPSED_STRING) && $this->at($index + 2, ';')) {
+                $literals[] = ['name' => stripcslashes(substr($literal->text, 1, -1)), 'line' => $token->line];
+            }
+        }
+
+        return $literals;
+    }
+
     private function isViewFacade(int $index): bool
     {
         $token = $this->tokens[$index] ?? null;

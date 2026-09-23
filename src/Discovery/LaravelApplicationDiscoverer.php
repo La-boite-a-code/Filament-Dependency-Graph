@@ -13,6 +13,7 @@ use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\PolicyDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\RelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ResourceDiscoverer;
+use LaBoiteACode\DependencyGraph\Contracts\ViewMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
 use LaBoiteACode\DependencyGraph\Discovery\Support\SourceScanner;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
@@ -24,6 +25,7 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ResourceData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewMapData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\RelationType;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
@@ -48,6 +50,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         private readonly LivewireComponentDiscoverer $livewireComponentDiscoverer,
         private readonly HttpMapDiscoverer $httpMapDiscoverer,
         private readonly PolicyDiscoverer $policyDiscoverer,
+        private readonly ViewMapDiscoverer $viewMapDiscoverer,
         private readonly SourceScanner $scanner,
     ) {}
 
@@ -78,6 +81,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         [$models, $relations] = $this->discoverRelations($models, $context);
 
         $http = $http->withPolicies($this->discoverPolicies($models, $context));
+        $views = $this->discoverViewMap($context, $livewireComponents, $http);
 
         $relations = $this->markInverseRelations($relations);
 
@@ -90,7 +94,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             static fn (LivewireComponentData $a, LivewireComponentData $b): int => strcmp($a->id, $b->id),
         );
 
-        $warnings = $this->aggregateWarnings($models, $relations, $resources, $livewireComponents, $http);
+        $warnings = $this->aggregateWarnings($models, $relations, $resources, $livewireComponents, $http, $views);
 
         return new ApplicationSnapshot(
             fingerprint: $this->fingerprint(
@@ -101,6 +105,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
                 $panels,
                 $livewireComponents,
                 $http,
+                $views,
             ),
             generatedAt: new DateTimeImmutable,
             models: $models,
@@ -110,7 +115,28 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             warnings: $warnings,
             livewireComponents: $livewireComponents,
             http: $http,
+            views: $views,
         );
+    }
+
+    /**
+     * @param  list<LivewireComponentData>  $livewireComponents
+     */
+    private function discoverViewMap(DiscoveryContext $context, array $livewireComponents, HttpMapData $http): ViewMapData
+    {
+        try {
+            return $this->viewMapDiscoverer->discover($context, $livewireComponents, $http);
+        } catch (Throwable $exception) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'view_discovery_failed',
+                message: sprintf('View map discovery failed: %s', $exception->getMessage()),
+                exceptionClass: $exception::class,
+            );
+
+            return new ViewMapData;
+        } finally {
+            $this->drainWarnings($this->viewMapDiscoverer);
+        }
     }
 
     private function discoverHttpMap(DiscoveryContext $context): HttpMapData
@@ -479,6 +505,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         array $resources,
         array $livewireComponents,
         HttpMapData $http,
+        ViewMapData $views,
     ): array {
         $warnings = $this->warnings;
 
@@ -525,6 +552,18 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
 
         foreach ($this->httpWarnings($http) as [$type, $class, $message]) {
             $warnings[] = new DiscoveryWarning(type: $type, message: $message, class: $class);
+        }
+
+        foreach ($views->views as $view) {
+            foreach ($view->warnings as $message) {
+                $warnings[] = new DiscoveryWarning(type: 'view_discovery', message: $message, class: $view->name);
+            }
+        }
+
+        foreach ($views->owners as $owner) {
+            foreach ($owner->warnings as $message) {
+                $warnings[] = new DiscoveryWarning(type: 'view_owner_discovery', message: $message, class: $owner->class ?? $owner->label);
+            }
         }
 
         usort($warnings, static function (DiscoveryWarning $a, DiscoveryWarning $b): int {
@@ -580,6 +619,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         array $panels,
         array $livewireComponents,
         HttpMapData $http,
+        ViewMapData $views,
     ): string {
         $payload = json_encode([
             'context' => $context->toArray(),
@@ -592,6 +632,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
                 $livewireComponents,
             ),
             'http' => $http->toArray(),
+            'views' => $views->toArray(),
         ]);
 
         return sha1($payload === false ? '' : $payload);
