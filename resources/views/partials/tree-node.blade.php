@@ -1,5 +1,12 @@
 <div class="fdg-tree-node" role="treeitem">
     <div class="fdg-tree-row">
+        @if ($item['type'] === 'group')
+            <span class="fdg-tree-group">{{ $item['label'] }}</span>
+
+            <x-filament::badge color="gray" size="sm" class="fdg-tree-type">
+                {{ count($item['children']) }}
+            </x-filament::badge>
+        @else
         @if ($item['relation'] !== null)
             <span class="fdg-tree-relation">{{ $item['relation'] }}</span>
             <span aria-hidden="true">&rarr;</span>
@@ -19,6 +26,7 @@
 
         @if ($item['already_shown'])
             <span class="fdg-muted">[{{ __('filament-dependency-graph::graph.tree.already_shown') }}]</span>
+        @endif
         @endif
     </div>
 

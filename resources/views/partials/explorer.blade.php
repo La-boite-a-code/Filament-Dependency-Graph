@@ -50,6 +50,19 @@
     <section class="fdg-explorer-section">
         <h3 class="fdg-explorer-heading">{{ __('filament-dependency-graph::graph.explorer.filters') }}</h3>
 
+        @if ($this->isHttpScope())
+            <label class="fdg-label" for="fdg-middleware">{{ __('filament-dependency-graph::graph.explorer.middleware') }}</label>
+            <x-filament::input.wrapper>
+                <x-filament::input.select id="fdg-middleware" wire:model.live="middlewareFilter">
+                    <option value="">{{ __('filament-dependency-graph::graph.explorer.middleware_all') }}</option>
+                    @foreach ($this->getMiddlewareOptions() as $middleware)
+                        <option value="{{ $middleware }}">{{ __('filament-dependency-graph::graph.explorer.middleware_with', ['name' => $middleware]) }}</option>
+                        <option value="!{{ $middleware }}">{{ __('filament-dependency-graph::graph.explorer.middleware_without', ['name' => $middleware]) }}</option>
+                    @endforeach
+                </x-filament::input.select>
+            </x-filament::input.wrapper>
+        @endif
+
         <label class="fdg-label" for="fdg-namespace">{{ __('filament-dependency-graph::graph.explorer.namespace') }}</label>
         <x-filament::input.wrapper>
             <x-filament::input

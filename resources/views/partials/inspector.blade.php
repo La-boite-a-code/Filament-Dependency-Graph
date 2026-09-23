@@ -25,6 +25,45 @@
             'color' => 'warning',
             'icon' => 'heroicon-m-puzzle-piece',
         ],
+        'route' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.route'),
+            'color' => 'primary',
+            'icon' => 'heroicon-m-globe-alt',
+        ],
+        'controller' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.controller'),
+            'color' => 'info',
+            'icon' => 'heroicon-m-cpu-chip',
+        ],
+        'form_request' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.form_request'),
+            'color' => 'warning',
+            'icon' => 'heroicon-m-clipboard-document-check',
+        ],
+        'policy' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.policy'),
+            'color' => 'danger',
+            'icon' => 'heroicon-m-shield-check',
+        ],
+        'event' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.event'),
+            'color' => 'warning',
+            'icon' => 'heroicon-m-megaphone',
+        ],
+        'listener' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.listener'),
+            'color' => 'gray',
+            'icon' => 'heroicon-m-ear',
+        ],
+        'job', 'mailable', 'notification' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.' . $inspection['subject_type']),
+            'color' => 'success',
+            'icon' => match ($inspection['subject_type']) {
+                'mailable' => 'heroicon-m-envelope',
+                'notification' => 'heroicon-m-bell',
+                default => 'heroicon-m-queue-list',
+            },
+        ],
         'edge' => [
             'label' => __('filament-dependency-graph::graph.inspector.types.edge'),
             'color' => 'warning',
@@ -56,6 +95,15 @@
         'pages' => 'heroicon-m-document-magnifying-glass',
         'relation_managers' => 'heroicon-m-user-group',
         'resources' => 'heroicon-m-rectangle-stack',
+        'http' => 'heroicon-m-globe-alt',
+        'action' => 'heroicon-m-bolt',
+        'middleware' => 'heroicon-m-funnel',
+        'actions' => 'heroicon-m-list-bullet',
+        'validation' => 'heroicon-m-clipboard-document-check',
+        'abilities' => 'heroicon-m-shield-check',
+        'listeners' => 'heroicon-m-ear',
+        'dispatched_by' => 'heroicon-m-arrow-down-left',
+        'dispatches' => 'heroicon-m-paper-airplane',
     ];
 
     $codeLabels = [
@@ -63,6 +111,9 @@
         'Class',
         'Component',
         'Connection',
+        'Controller',
+        'Livewire component',
+        'URI',
         'File',
         'Foreign key',
         'Icon',
@@ -80,8 +131,10 @@
     ];
 
     $badgeListLabels = [
+        'Abilities',
         'Badges',
         'Components',
+        'Middleware',
         'Fillable',
         'Guarded',
         'Hidden',
