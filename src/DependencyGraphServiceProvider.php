@@ -51,6 +51,7 @@ use LaBoiteACode\DependencyGraph\Export\JsonGraphExporter;
 use LaBoiteACode\DependencyGraph\Export\MermaidGraphExporter;
 use LaBoiteACode\DependencyGraph\Graph\DefaultGraphBuilder;
 use LaBoiteACode\DependencyGraph\Inspection\DefaultNodeInspector;
+use LaBoiteACode\DependencyGraph\Inspection\HttpNodeInspector;
 use LaBoiteACode\DependencyGraph\Inspection\LivewireComponentInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ModelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\PanelInspector;
@@ -146,6 +147,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
                 new ModelInspector,
                 new ResourceInspector,
                 new LivewireComponentInspector,
+                new HttpNodeInspector,
                 new PanelInspector,
             ]);
         });
