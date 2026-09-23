@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use LaBoiteACode\DependencyGraph\Contracts\LivewireComponentDiscoverer as LivewireComponentDiscovererContract;
 use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
+use LaBoiteACode\DependencyGraph\Discovery\Support\SourceFile;
+use LaBoiteACode\DependencyGraph\Discovery\Support\SourceScanner;
 use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
@@ -40,6 +42,7 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
 
     public function __construct(
         private readonly ClassCandidateFinder $candidates,
+        private readonly SourceScanner $scanner,
     ) {}
 
     public function discover(DiscoveryContext $context): array
@@ -111,9 +114,9 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
         $warnings = [];
 
         $file = $reflection->getFileName();
-        $source = is_string($file) ? @file_get_contents($file) : false;
+        $source = is_string($file) ? $this->scanner->file($file) : null;
 
-        if ($source === false) {
+        if ($source === null) {
             $warnings[] = 'Source file could not be read; static model references and the rendered view were not inspected.';
             $view = null;
         } else {
@@ -121,7 +124,7 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
                 $modelReferences,
                 $this->sourceModelReferences($reflection, $source),
             );
-            $view = $this->renderedView($source);
+            $view = $this->scanner->renderedView($source);
         }
 
         ksort($modelReferences, SORT_STRING);
@@ -261,13 +264,23 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
      * @param  ReflectionClass<Component>  $reflection
      * @return array<string, list<string>>
      */
-    private function sourceModelReferences(ReflectionClass $reflection, string $source): array
+    private function sourceModelReferences(ReflectionClass $reflection, SourceFile $source): array
     {
         $references = [];
-        $imports = $this->importsBeforeClass($reflection, $source);
+        $seen = [];
 
-        foreach ($this->staticClassReferences($source) as $reference) {
-            $class = $this->resolveSourceClass($reference, $reflection->getNamespaceName(), $imports);
+        foreach ($this->scanner->staticClassReferences($source->tokens) as $reference) {
+            if (isset($seen[$reference['reference']])) {
+                continue;
+            }
+
+            $seen[$reference['reference']] = true;
+
+            $class = $this->scanner->resolveClass(
+                $reference['reference'],
+                $reflection->getNamespaceName(),
+                $source->imports,
+            );
 
             if ($class !== null) {
                 $this->recordModelReference(
@@ -279,119 +292,6 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
         }
 
         return $references;
-    }
-
-    /**
-     * Reads actual class tokens followed by ::, ignoring comments and string
-     * literals that merely contain code-like text.
-     *
-     * @return list<string>
-     */
-    private function staticClassReferences(string $source): array
-    {
-        $tokens = token_get_all($source);
-        $references = [];
-        $classTokenTypes = [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NAME_RELATIVE];
-
-        foreach ($tokens as $index => $token) {
-            if (! is_array($token) || ! in_array($token[0], $classTokenTypes, true)) {
-                continue;
-            }
-
-            $next = $this->nextSignificantToken($tokens, $index + 1);
-
-            if (is_array($next) && $next[0] === T_DOUBLE_COLON) {
-                $references[] = $token[1];
-            }
-        }
-
-        return array_values(array_unique($references));
-    }
-
-    /**
-     * @param  ReflectionClass<Component>  $reflection
-     * @return array<string, string> Import alias to fully qualified class.
-     */
-    private function importsBeforeClass(ReflectionClass $reflection, string $source): array
-    {
-        $lines = preg_split('/\R/', $source) ?: [];
-        $prefix = implode("\n", array_slice($lines, 0, max(0, $reflection->getStartLine() - 1)));
-        $imports = [];
-
-        preg_match_all('/^\s*use\s+([^;]+);/m', $prefix, $matches);
-
-        foreach ($matches[1] as $statement) {
-            $statement = trim($statement);
-
-            if (
-                $statement === ''
-                || str_starts_with($statement, 'function ')
-                || str_starts_with($statement, 'const ')
-            ) {
-                continue;
-            }
-
-            foreach ($this->expandImportStatement($statement) as $import) {
-                $parts = preg_split('/\s+as\s+/i', trim($import), 2) ?: [];
-                $class = ltrim($parts[0] ?? '', '\\');
-
-                if ($class === '') {
-                    continue;
-                }
-
-                $alias = $parts[1] ?? ClassName::shortName($class);
-                $imports[$alias] = $class;
-            }
-        }
-
-        return $imports;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function expandImportStatement(string $statement): array
-    {
-        if (preg_match('/^(.+?)\\\\\{(.+)}$/', $statement, $matches) === 1) {
-            $prefix = rtrim($matches[1], '\\');
-
-            return array_map(
-                static fn (string $member): string => $prefix . '\\' . trim($member),
-                explode(',', $matches[2]),
-            );
-        }
-
-        return array_map('trim', explode(',', $statement));
-    }
-
-    /**
-     * @param  array<string, string>  $imports
-     */
-    private function resolveSourceClass(string $reference, string $namespace, array $imports): ?string
-    {
-        $reference = trim($reference);
-
-        if (in_array(strtolower($reference), ['self', 'static', 'parent'], true)) {
-            return null;
-        }
-
-        if (str_starts_with($reference, '\\')) {
-            return ltrim($reference, '\\');
-        }
-
-        if (str_starts_with(strtolower($reference), 'namespace\\')) {
-            $relative = substr($reference, strlen('namespace\\'));
-
-            return $namespace === '' ? $relative : $namespace . '\\' . $relative;
-        }
-
-        [$first, $remaining] = array_pad(explode('\\', $reference, 2), 2, null);
-
-        if (isset($imports[$first])) {
-            return $remaining === null ? $imports[$first] : $imports[$first] . '\\' . $remaining;
-        }
-
-        return $namespace === '' ? $reference : $namespace . '\\' . $reference;
     }
 
     /**
@@ -422,61 +322,6 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
         }
 
         return $left;
-    }
-
-    private function renderedView(string $source): ?string
-    {
-        $tokens = token_get_all($source);
-
-        foreach ($tokens as $index => $token) {
-            if (! is_array($token) || $token[0] !== T_STRING || strtolower($token[1]) !== 'view') {
-                continue;
-            }
-
-            $openingParenthesisIndex = $this->nextSignificantTokenIndex($tokens, $index + 1);
-
-            if ($openingParenthesisIndex === null || $tokens[$openingParenthesisIndex] !== '(') {
-                continue;
-            }
-
-            $argument = $this->nextSignificantToken($tokens, $openingParenthesisIndex + 1);
-
-            if (! is_array($argument) || $argument[0] !== T_CONSTANT_ENCAPSED_STRING) {
-                continue;
-            }
-
-            return stripcslashes(substr($argument[1], 1, -1));
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  list<mixed>  $tokens
-     */
-    private function nextSignificantToken(array $tokens, int $offset): mixed
-    {
-        $index = $this->nextSignificantTokenIndex($tokens, $offset);
-
-        return $index === null ? null : $tokens[$index];
-    }
-
-    /**
-     * @param  list<mixed>  $tokens
-     */
-    private function nextSignificantTokenIndex(array $tokens, int $offset): ?int
-    {
-        for ($index = $offset, $count = count($tokens); $index < $count; $index++) {
-            $token = $tokens[$index];
-
-            if (is_array($token) && in_array($token[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
-                continue;
-            }
-
-            return $index;
-        }
-
-        return null;
     }
 
     /**
