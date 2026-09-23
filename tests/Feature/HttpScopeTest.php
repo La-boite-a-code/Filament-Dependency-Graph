@@ -67,8 +67,17 @@ it('shows routes and everything they lead to in the HTTP scope', function (): vo
         'notification' => 1,
         'policy' => 2,
         'route' => 11,
+        'view' => 6,
     ])
-        ->and(labelsOfType($graph, NodeType::Model))->toBe(['Customer', 'Order', 'Product', 'User']);
+        ->and(labelsOfType($graph, NodeType::Model))->toBe(['Customer', 'Order', 'Product', 'User'])
+        ->and(labelsOfType($graph, NodeType::View))->toBe([
+            'layouts.app',
+            'livewire.order-dashboard',
+            'mail.order-shipped',
+            'mail.order-updated',
+            'orders.index',
+            'pages.about',
+        ]);
 });
 
 it('links routes, controllers, requests, models, policies, dispatches and listeners', function (): void {
@@ -80,7 +89,16 @@ it('links routes, controllers, requests, models, policies, dispatches and listen
         ->and(count($graph->edgesOfType(EdgeType::ControllerUsesModel)))->toBe(3)
         ->and(count($graph->edgesOfType(EdgeType::ModelGuardedByPolicy)))->toBe(2)
         ->and(count($graph->edgesOfType(EdgeType::EventHandledByListener)))->toBe(3)
-        ->and(count($graph->edgesOfType(EdgeType::Dispatches)))->toBe(7);
+        ->and(count($graph->edgesOfType(EdgeType::Dispatches)))->toBe(7)
+        ->and(count($graph->edgesOfType(EdgeType::RendersView)))->toBe(6);
+});
+
+it('shows rendered views as leaves of the HTTP scope, per action', function (): void {
+    $graph = httpGraph();
+
+    expect($graph->nodesOfType(NodeType::ExternalView))->toBe([])
+        ->and($graph->nodesOfType(NodeType::BladeComponent))->toBe([])
+        ->and(labelsOfType(httpGraph(middleware: 'auth'), NodeType::View))->toBe(['mail.order-shipped', 'mail.order-updated']);
 });
 
 it('merges the actions of one controller into a single edge per target', function (): void {

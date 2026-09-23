@@ -22,6 +22,8 @@ final class DefaultGraphBuilder implements GraphBuilder
 {
     private readonly HttpGraphAssembler $http;
 
+    private readonly ViewGraphAssembler $views;
+
     public function __construct(
         private readonly NodeFactory $nodes,
         private readonly EdgeFactory $edges,
@@ -29,6 +31,7 @@ final class DefaultGraphBuilder implements GraphBuilder
         private readonly OrphanDetector $orphans,
     ) {
         $this->http = new HttpGraphAssembler($nodes, $edges);
+        $this->views = new ViewGraphAssembler($nodes, $edges);
     }
 
     public function build(ApplicationSnapshot $snapshot): Graph
@@ -128,6 +131,16 @@ final class DefaultGraphBuilder implements GraphBuilder
         }
 
         foreach ($httpEdges as $edge) {
+            $edges[$edge->id->value] ??= $edge;
+        }
+
+        [$viewNodes, $viewEdges] = $this->views->assemble($snapshot->views);
+
+        foreach ($viewNodes as $node) {
+            $nodes[$node->id->value] ??= $node;
+        }
+
+        foreach ($viewEdges as $edge) {
             $edges[$edge->id->value] ??= $edge;
         }
 
