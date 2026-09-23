@@ -55,6 +55,8 @@ class DependencyGraphPlugin implements Plugin
 
     protected ?bool $httpScopeAllowed = null;
 
+    protected ?bool $viewsScopeAllowed = null;
+
     protected ?bool $vendorModelsScanned = null;
 
     protected ?bool $livewireComponentsScanned = null;
@@ -318,6 +320,17 @@ class DependencyGraphPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * Turns the view map on or off: when disabled, templates are not read
+     * and the Views scope is not offered.
+     */
+    public function allowViewsScope(bool $condition = true): static
+    {
+        $this->viewsScopeAllowed = $condition;
+
+        return $this;
+    }
+
     public function scanVendorModels(bool $condition = true): static
     {
         $this->vendorModelsScanned = $condition;
@@ -478,6 +491,10 @@ class DependencyGraphPlugin implements Plugin
 
         if ($this->httpScopeAllowed !== null) {
             $config->set('filament-dependency-graph.http.enabled', $this->httpScopeAllowed);
+        }
+
+        if ($this->viewsScopeAllowed !== null) {
+            $config->set('filament-dependency-graph.views.enabled', $this->viewsScopeAllowed);
         }
 
         if ($this->vendorModelsScanned !== null) {

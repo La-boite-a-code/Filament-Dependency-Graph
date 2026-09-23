@@ -20,6 +20,11 @@ enum NodeType: string
     case Job = 'job';
     case Mailable = 'mailable';
     case Notification = 'notification';
+    case View = 'view';
+    case BladeComponent = 'blade_component';
+    case FilamentComponent = 'filament_component';
+    case ExternalView = 'external_view';
+    case DynamicView = 'dynamic_view';
 
     /**
      * Node types that only exist in the HTTP scope.
@@ -47,6 +52,28 @@ enum NodeType: string
     }
 
     /**
+     * Node types that only exist in the Views scope (and as leaves of the
+     * HTTP scope for rendered views).
+     *
+     * @return list<self>
+     */
+    public static function viewTypes(): array
+    {
+        return [
+            self::View,
+            self::BladeComponent,
+            self::FilamentComponent,
+            self::ExternalView,
+            self::DynamicView,
+        ];
+    }
+
+    public function isView(): bool
+    {
+        return in_array($this, self::viewTypes(), true);
+    }
+
+    /**
      * Lower values are ordered first when sorting nodes deterministically.
      */
     public function sortPriority(): int
@@ -66,6 +93,11 @@ enum NodeType: string
             self::Job => 11,
             self::Mailable => 12,
             self::Notification => 13,
+            self::View => 14,
+            self::BladeComponent => 15,
+            self::FilamentComponent => 16,
+            self::ExternalView => 17,
+            self::DynamicView => 18,
         };
     }
 }

@@ -76,6 +76,7 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
         if (
             ($scope === GraphScope::Laravel && ! $this->config->get('filament-dependency-graph.laravel_scope_enabled', true))
             || ($scope === GraphScope::Http && ! $this->config->get('filament-dependency-graph.http.enabled', true))
+            || ($scope === GraphScope::Views && ! $this->config->get('filament-dependency-graph.views.enabled', true))
         ) {
             $scope = GraphScope::Filament;
         }

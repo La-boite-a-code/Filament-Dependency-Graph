@@ -99,6 +99,31 @@ final class StableIdentifier
             : $kind->value . ':' . self::normalizeClass($class);
     }
 
+    public static function view(string $name): string
+    {
+        return 'view:' . $name;
+    }
+
+    public static function bladeComponent(string $class): string
+    {
+        return 'blade-component:' . self::normalizeClass($class);
+    }
+
+    public static function filamentComponent(string $class): string
+    {
+        return 'filament-component:' . self::normalizeClass($class);
+    }
+
+    public static function externalView(string $reference): string
+    {
+        return 'external-view:' . $reference;
+    }
+
+    public static function dynamicView(string $sourceViewName, int $line): string
+    {
+        return 'dynamic-view:' . $sourceViewName . ':' . $line;
+    }
+
     public static function edge(EdgeType $type, string $sourceId, string $targetId, ?string $discriminator = null): string
     {
         $identifier = 'edge:' . $type->value . ':' . $sourceId . ':' . $targetId;

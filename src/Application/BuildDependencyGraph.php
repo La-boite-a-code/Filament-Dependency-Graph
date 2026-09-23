@@ -46,6 +46,7 @@ final class BuildDependencyGraph
             GraphScope::Filament => $this->restrictToFilamentScope($graph),
             GraphScope::Laravel => $this->withoutHttpNodes($graph),
             GraphScope::Http => $this->restrictToHttpScope($graph, $query->middleware),
+            GraphScope::Views => $this->restrictToViewsScope($graph),
         };
 
         $graph = $this->filterNodeTypes($graph, $query);
@@ -197,14 +198,14 @@ final class BuildDependencyGraph
 
     /**
      * The Laravel scope keeps its historical content: models, relations,
-     * resources and Livewire components, without the HTTP map.
+     * resources and Livewire components, without the HTTP and view maps.
      */
     private function withoutHttpNodes(Graph $graph): Graph
     {
         $nodeIds = [];
 
         foreach ($graph->nodes as $node) {
-            if (! $node->type->isHttp()) {
+            if (! $node->type->isHttp() && ! $node->type->isView()) {
                 $nodeIds[] = $node->id->value;
             }
         }
@@ -229,6 +230,9 @@ final class BuildDependencyGraph
             EdgeType::ModelGuardedByPolicy,
             EdgeType::Dispatches,
             EdgeType::EventHandledByListener,
+            // One hop to the rendered view: view edges are not followed, so
+            // views stay leaves of the HTTP scope.
+            EdgeType::RendersView,
         ];
 
         $middleware = $middleware === null || trim($middleware) === '' ? null : trim($middleware);
@@ -276,6 +280,54 @@ final class BuildDependencyGraph
 
                 $keep[$edge->target->value] = true;
                 $queue[] = $edge->target->value;
+            }
+        }
+
+        return $graph->subgraph(array_keys($keep));
+    }
+
+    /**
+     * The Views scope starts from every application view and every owner
+     * rendering one, and follows the view edges down to components,
+     * Livewire components, package views and dynamic references.
+     */
+    private function restrictToViewsScope(Graph $graph): Graph
+    {
+        $followed = [
+            EdgeType::RendersView,
+            EdgeType::ViewExtends,
+            EdgeType::ViewIncludes,
+            EdgeType::ViewUsesComponent,
+            EdgeType::ViewRendersLivewire,
+            EdgeType::ViewReferencesDynamic,
+        ];
+
+        $queue = [];
+
+        foreach ($graph->nodes as $node) {
+            if ($node->type === NodeType::View) {
+                $queue[] = $node->id->value;
+
+                continue;
+            }
+
+            foreach ($graph->outgoingEdges($node->id) as $edge) {
+                if ($edge->type === EdgeType::RendersView) {
+                    $queue[] = $node->id->value;
+
+                    break;
+                }
+            }
+        }
+
+        $keep = array_fill_keys($queue, true);
+
+        for ($cursor = 0; $cursor < count($queue); $cursor++) {
+            foreach ($graph->outgoingEdges($queue[$cursor]) as $edge) {
+                if (in_array($edge->type, $followed, true) && ! isset($keep[$edge->target->value])) {
+                    $keep[$edge->target->value] = true;
+                    $queue[] = $edge->target->value;
+                }
             }
         }
 

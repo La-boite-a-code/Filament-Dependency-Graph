@@ -99,6 +99,16 @@ final class DiscoverApplication
             excludedRouteUris: $this->stringList('http.exclude.uris'),
             followInjectedClasses: (bool) $this->config->get('filament-dependency-graph.http.follow_injected_classes', true),
             invokeFormRequestRules: (bool) $this->config->get('filament-dependency-graph.http.form_request_rules', false),
+            discoverViews: (bool) $this->config->get('filament-dependency-graph.views.enabled', true),
+            includeVendorViewOverrides: (bool) $this->config->get('filament-dependency-graph.views.include_vendor_overrides', false),
+            explorePackageViews: (bool) $this->config->get('filament-dependency-graph.views.explore_package_views', false),
+            bladeComponentPaths: $this->stringList('views.blade_component_paths', [$this->app->basePath('app/View/Components')]),
+            filamentViewPaths: $this->stringList('views.filament_paths', [$this->app->basePath('app/Filament')]),
+            mailPaths: $this->stringList('views.mail_paths', [
+                $this->app->basePath('app/Mail'),
+                $this->app->basePath('app/Notifications'),
+            ]),
+            excludedViews: $this->stringList('views.exclude.views'),
         );
     }
 

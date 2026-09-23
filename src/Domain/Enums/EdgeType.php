@@ -17,4 +17,10 @@ enum EdgeType: string
     case ModelGuardedByPolicy = 'model_guarded_by_policy';
     case EventHandledByListener = 'event_handled_by_listener';
     case Dispatches = 'dispatches';
+    case RendersView = 'renders_view';
+    case ViewExtends = 'view_extends';
+    case ViewIncludes = 'view_includes';
+    case ViewUsesComponent = 'view_uses_component';
+    case ViewRendersLivewire = 'view_renders_livewire';
+    case ViewReferencesDynamic = 'view_references_dynamic';
 }

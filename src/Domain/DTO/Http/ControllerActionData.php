@@ -19,11 +19,13 @@ final readonly class ControllerActionData
      * @param  list<string>  $formRequests
      * @param  array<string, list<string>>  $models  Model class to sources (binding, type, static).
      * @param  list<DispatchReference>  $dispatches
+     * @param  list<string>  $views  View names the action renders, found statically.
      */
     public function __construct(
         public array $formRequests,
         public array $models,
         public array $dispatches,
+        public array $views = [],
     ) {}
 
     /**
@@ -31,11 +33,12 @@ final readonly class ControllerActionData
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{form_requests: list<string>, models: array<string, list<string>>, dispatches: list<array<string, mixed>>} $data */
+        /** @var array{form_requests: list<string>, models: array<string, list<string>>, dispatches: list<array<string, mixed>>, views?: list<string>} $data */
         return new self(
             formRequests: $data['form_requests'],
             models: $data['models'],
             dispatches: DispatchReference::listFromArray($data['dispatches']),
+            views: $data['views'] ?? [],
         );
     }
 
@@ -48,6 +51,7 @@ final readonly class ControllerActionData
             'form_requests' => $this->formRequests,
             'models' => $this->models,
             'dispatches' => DispatchReference::listToArray($this->dispatches),
+            'views' => $this->views,
         ];
     }
 }

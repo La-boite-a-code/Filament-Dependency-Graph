@@ -159,6 +159,56 @@ final readonly class MethodSource
         return $calls;
     }
 
+    /**
+     * Literal view names: view('x'), View::make('x'), ->view('x'),
+     * ->markdown('x'), ->text('x'), ->layout('x'), and the view:, markdown:
+     * and text: named arguments of mail content definitions.
+     *
+     * @return list<array{name: string, how: string, line: int}>
+     */
+    public function viewLiterals(): array
+    {
+        $literals = [];
+
+        foreach ($this->tokens as $index => $token) {
+            $name = strtolower($token->text);
+
+            if (! $token->is(T_STRING)) {
+                continue;
+            }
+
+            $isMethodCall = $this->at($index - 1, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR]);
+
+            $how = match (true) {
+                in_array($name, ['view', 'markdown', 'text'], true) && $this->at($index + 1, ':') => $name,
+                $name === 'view' && $this->at($index + 1, '(') => 'view',
+                in_array($name, ['markdown', 'text', 'layout'], true) && $isMethodCall && $this->at($index + 1, '(') => $name,
+                $name === 'make' && $this->at($index - 1, T_DOUBLE_COLON) && $this->isViewFacade($index - 2) && $this->at($index + 1, '(') => 'view',
+                default => null,
+            };
+
+            $literal = $this->tokens[$index + 2] ?? null;
+
+            if ($how !== null && $literal !== null && $literal->is(T_CONSTANT_ENCAPSED_STRING)) {
+                $literals[] = ['name' => stripcslashes(substr($literal->text, 1, -1)), 'how' => $how, 'line' => $token->line];
+            }
+        }
+
+        return $literals;
+    }
+
+    private function isViewFacade(int $index): bool
+    {
+        $token = $this->tokens[$index] ?? null;
+
+        if ($token === null || ! SourceScanner::isClassName($token)) {
+            return false;
+        }
+
+        return in_array(ltrim((string) $this->resolve($token->text), '\\'), ['View', 'Illuminate\\Support\\Facades\\View'], true)
+            || ltrim($token->text, '\\') === 'View';
+    }
+
     private function resolve(string $reference): ?string
     {
         return $this->scanner->resolveClass($reference, $this->file->namespace, $this->file->imports);

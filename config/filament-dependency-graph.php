@@ -68,7 +68,8 @@ return [
     | The Filament scope starts from the resources registered in the selected
     | panels. The Laravel scope shows every discovered Eloquent model, even
     | when no Filament resource exposes it. The HTTP scope starts from the
-    | application routes; it is controlled by the "http.enabled" option.
+    | application routes; it is controlled by the "http.enabled" option. The
+    | Views scope maps Blade templates; it is controlled by "views.enabled".
     |
     */
 
@@ -163,6 +164,42 @@ return [
         ],
         'follow_injected_classes' => true,
         'form_request_rules' => false,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | View map
+    |--------------------------------------------------------------------------
+    |
+    | Blade templates, Blade class components, Livewire components, Filament
+    | classes with a custom view, mailables and notifications, and how they
+    | include, extend and render each other. Templates are read as text and
+    | names are resolved by the framework: nothing is compiled or rendered.
+    |
+    | Package views used by the application are shown as leaves; enable
+    | "explore_package_views" to read them as well.
+    |
+    */
+
+    'views' => [
+        'enabled' => true,
+        // resources/views/vendor/** overrides of package views.
+        'include_vendor_overrides' => false,
+        'explore_package_views' => false,
+        'blade_component_paths' => [
+            app_path('View/Components'),
+        ],
+        'filament_paths' => [
+            app_path('Filament'),
+        ],
+        'mail_paths' => [
+            app_path('Mail'),
+            app_path('Notifications'),
+        ],
+        'exclude' => [
+            // View names, Str::is() patterns, for example 'errors.*'.
+            'views' => [],
+        ],
     ],
 
     /*
