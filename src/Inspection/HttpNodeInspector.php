@@ -77,7 +77,7 @@ final class HttpNodeInspector implements NodeInspector
                 'Type' => $this->string($node, 'action_type'),
                 'Controller' => $this->string($node, 'controller_class'),
                 'Method' => $this->string($node, 'controller_method'),
-                'Livewire component' => $this->string($node, 'livewire_class'),
+                'Livewire component' => $this->string($node, 'livewire_class') ?? $this->string($node, 'livewire_component'),
                 'View' => $this->string($node, 'view'),
                 'File' => $this->string($node, 'file'),
             ]),

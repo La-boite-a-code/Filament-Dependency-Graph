@@ -1811,8 +1811,8 @@ class DependencyGraphPage extends Page implements HasTable
         }
 
         $unreferenced = array_values(array_filter(
-            $graph->nodesOfType(NodeType::View),
-            static fn (Node $view): bool => in_array('No reference found', $view->badges, true),
+            [...$graph->nodesOfType(NodeType::View), ...$graph->nodesOfType(NodeType::BladeComponent)],
+            static fn (Node $node): bool => in_array('No reference found', $node->badges, true),
         ));
 
         if ($unreferenced !== []) {
@@ -1877,7 +1877,7 @@ class DependencyGraphPage extends Page implements HasTable
     /**
      * @param  list<Node>  $nodes
      * @param  (Closure(Edge): (bool|string))|null  $follow  Defaults to the HTTP rules of each root.
-     * @param  array<string, true>|null  $visited  Shared across roots when given; each root still unfolds.
+     * @param  array<string, int>|null  $visited  Shared across roots when given; each root still unfolds.
      * @return array<string, mixed>
      */
     protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth, ?Closure $follow = null, ?array &$visited = null): array
@@ -1895,7 +1895,6 @@ class DependencyGraphPage extends Page implements HasTable
                 continue;
             }
 
-            unset($visited[$rootId]);
             $children[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited, $filter);
         }
 
@@ -1910,7 +1909,7 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
-     * @param  array<string, true>  $visited
+     * @param  array<string, int>  $visited  Node id to the depth it was unfolded with.
      * @param  (Closure(Edge): (bool|string))|null  $follow  False skips an edge, a string replaces its branch label.
      * @return array<string, mixed>|null
      */
@@ -1928,7 +1927,9 @@ class DependencyGraphPage extends Page implements HasTable
             return null;
         }
 
-        $alreadyShown = isset($visited[$nodeId]);
+        // A node cut short by the depth limit unfolds again when it is
+        // reached with more depth left.
+        $alreadyShown = ($visited[$nodeId] ?? 0) >= $remainingDepth;
 
         $item = [
             'id' => $nodeId,
@@ -1943,7 +1944,7 @@ class DependencyGraphPage extends Page implements HasTable
             return $item;
         }
 
-        $visited[$nodeId] = true;
+        $visited[$nodeId] = $remainingDepth;
 
         $children = [];
 

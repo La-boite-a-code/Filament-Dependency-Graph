@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use LaBoiteACode\DependencyGraph\Discovery\Views\LivewireAdapter;
+use LaBoiteACode\DependencyGraph\Discovery\Support\LivewireAdapter;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
 
 it('resolves Livewire 4 classes, single-file and multi-file components', function (): void {

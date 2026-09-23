@@ -43,6 +43,14 @@ final readonly class ViewData
     }
 
     /**
+     * @param  list<ViewReference>  $references
+     */
+    public function withReferences(array $references): self
+    {
+        return new self($this->id, $this->name, $this->file, $this->kind, $references, $this->status, $this->warnings);
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self

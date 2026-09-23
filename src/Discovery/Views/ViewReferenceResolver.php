@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Illuminate\View\Compilers\BladeCompiler;
 use Illuminate\View\Compilers\ComponentTagCompiler;
 use Illuminate\View\Factory;
+use LaBoiteACode\DependencyGraph\Discovery\Support\LivewireAdapter;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
 use LaBoiteACode\DependencyGraph\Support\NamespaceMatcher;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
@@ -103,9 +104,10 @@ final class ViewReferenceResolver
      * The view Livewire renders for a component without a render() method:
      * the file named after the component under the Livewire view path.
      */
-    public function livewireConventionView(string $alias): ?ViewResolution
+    public function livewireConventionView(string $class, string $alias): ?ViewResolution
     {
         $base = config('livewire.view_path', resource_path('views/livewire'));
+        $alias = $this->livewire->name($class) ?? $alias;
 
         if (! is_string($base) || $alias === '') {
             return null;
@@ -114,6 +116,11 @@ final class ViewReferenceResolver
         $name = $this->applicationPaths[$this->realPath(rtrim($base, '/\\') . '/' . str_replace('.', '/', $alias) . '.blade.php')] ?? null;
 
         return $name === null ? null : $this->view($name);
+    }
+
+    public function livewireDefaultLayout(): ?string
+    {
+        return $this->livewire->defaultLayout();
     }
 
     /**
@@ -206,14 +213,27 @@ final class ViewReferenceResolver
             return $this->componentClassResolution(ltrim($resolved, '\\'));
         }
 
-        $resolution = $this->view($resolved);
+        // Not recorded: the finder only knows the hashed namespace of
+        // anonymous component paths, the graph shows the prefix the
+        // application chose.
+        $resolution = $this->memo['view|' . $resolved] ??= $this->resolveView($resolved);
         $readable = $this->withAnonymousPrefix($resolved);
 
-        // The finder only knows the hashed namespace; keep it to resolve,
-        // show the prefix the application chose.
-        return $resolution->kind === ViewResolution::EXTERNAL && $readable !== $resolved
-            ? $this->external($readable, $this->package($readable), $resolution->missing)
-            : $resolution;
+        if ($readable === $resolved) {
+            return $resolution;
+        }
+
+        return match ($resolution->kind) {
+            ViewResolution::EXTERNAL => $this->external($readable, $this->package($readable), $resolution->missing),
+            ViewResolution::PACKAGE_VIEW => new ViewResolution(
+                ViewResolution::PACKAGE_VIEW,
+                StableIdentifier::view($readable),
+                $readable,
+                $resolution->path,
+                $this->package($readable),
+            ),
+            default => $resolution,
+        };
     }
 
     private function componentClassResolution(string $class): ViewResolution

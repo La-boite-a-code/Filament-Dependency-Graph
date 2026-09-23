@@ -10,6 +10,7 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewMapData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
+use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\FilamentViews\Widgets\StatsWidget;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
@@ -201,6 +202,7 @@ it('maps components routed with Route::livewire()', function (): void {
     app('view')->getFinder()->addLocation($path);
     app('livewire.finder')->addLocation(viewPath: $path . '/livewire');
 
+    config()->set('livewire.component_layout', 'layouts.app');
     Route::livewire('counter-page', StandaloneCounter::class);
     Route::livewire('single-file-counter', 'counter');
 
@@ -224,7 +226,7 @@ it('maps components routed with Route::livewire()', function (): void {
         ->actionType->toBe(RouteData::ACTION_LIVEWIRE)
         ->livewireClass->toBeNull()
         ->livewireComponent->toBe('counter')
-        ->and($owners[$routes['single-file-counter']->id])->toBe(['Route::livewire view:livewire.counter']);
+        ->and($owners[$routes['single-file-counter']->id])->toBe(['Route::livewire view:livewire.counter', 'layout view:layouts.app']);
 });
 
 it('never compiles templates, so custom directives and precompilers never run', function (): void {
@@ -243,4 +245,45 @@ it('never compiles templates, so custom directives and precompilers never run', 
     viewMap();
 
     expect($calls)->toBe(0);
+});
+
+it('gives routed full-page components the configured layout', function (): void {
+    config()->set('livewire.component_layout', null);
+    config()->set('livewire.layout', null);
+    // Livewire 4 reads component_layout, Livewire 3 reads layout.
+    config()->set(app()->bound('livewire.finder') ? 'livewire.component_layout' : 'livewire.layout', 'layouts.app');
+    Route::get('counter-page', StandaloneCounter::class);
+    Route::getRoutes()->refreshNameLookups();
+
+    $owners = [];
+
+    foreach (viewMap()->owners as $owner) {
+        $owners[$owner->class ?? $owner->id] = array_map(static fn ($rendered): string => $rendered->how . ' ' . $rendered->name, $owner->renders);
+    }
+
+    expect($owners[StandaloneCounter::class])->toBe(['render livewire.standalone-counter', 'layout layouts.app']);
+});
+
+it('points a Filament widget embedded with @livewire to its Filament node', function (): void {
+    $map = viewMap();
+    $host = viewsByName($map)['pages.about'];
+
+    expect(array_map(static fn ($reference): ?string => $reference->targetId, $host->references))
+        ->toContain(StableIdentifier::filamentComponent(StatsWidget::class))
+        ->and(array_map(static fn ($external): string => $external->reference, $map->externals))
+        ->not->toContain(StatsWidget::class);
+});
+
+it('names anonymous components by the prefix the application chose', function (): void {
+    $path = dirname(__DIR__, 2) . '/Fixtures/views-anonymous';
+    Blade::anonymousComponentPath($path . '/kit', 'kit');
+    app('view')->getFinder()->addLocation($path . '/host');
+
+    $externals = array_map(static fn ($external): string => $external->reference, viewMap()->externals);
+    $explored = viewsByName(viewMap(explorePackageViews: true));
+
+    expect($externals)->toContain('kit::button')
+        ->and(array_filter($externals, static fn (string $reference): bool => preg_match('/^[0-9a-f]{32}::/', $reference) === 1))->toBe([])
+        ->and($explored)->toHaveKey('kit::button')
+        ->and(array_filter(array_keys($explored), static fn (string $name): bool => preg_match('/^[0-9a-f]{32}::/', $name) === 1))->toBe([]);
 });

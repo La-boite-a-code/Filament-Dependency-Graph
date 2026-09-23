@@ -132,7 +132,7 @@ return [
     'tree' => [
         'already_shown' => 'deja affiche',
         'undispatched_events' => 'Evenements sans declencheur detecte',
-        'unreferenced_views' => 'Vues sans reference detectee',
+        'unreferenced_views' => 'Vues et composants sans reference detectee',
         'groups' => [
             'routes' => 'Routes et controleurs',
             'livewire' => 'Livewire',

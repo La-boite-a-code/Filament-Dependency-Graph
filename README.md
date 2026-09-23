@@ -147,7 +147,7 @@ Press `/` and type: the search matches class names, labels, table names, namespa
 
 - **Filament scope** (default): starts from the resources registered in the selected panels and includes their models plus related models up to the configured depth.
 - **Laravel scope**: every discovered Eloquent model and standalone Livewire component, including models that no resource exposes. Disable it entirely with `laravel_scope_enabled => false` or `->allowLaravelScope(false)`.
-- **HTTP scope**: the application routes and everything they lead to - see [HTTP map](#http-map). Disable it, and its discovery, with `http.enabled => false` or `->allowHttpScope(false)`. Rendered views appear as leaves, one hop from the route or action that renders them.
+- **HTTP scope**: the application routes and everything they lead to - see [HTTP map](#http-map). Disable it, and its discovery, with `http.enabled => false` or `->allowHttpScope(false)`; the Views scope still reads routes and controller actions to find the views they render. Rendered views appear as leaves, one hop from the route or action that renders them.
 - **Views scope**: the Blade templates and what renders them - see [View map](#view-map). Disable it, and its discovery, with `views.enabled => false` or `->allowViewsScope(false)`.
 
 ## HTTP map
@@ -197,9 +197,11 @@ Templates are read as text: `@extends`, `@include`, `@includeIf`, `@includeWhen`
 
 Each view has a kind, inferred from how it is used: `layout`, `page`, `partial`, `component`, `livewire` or `mail`. Templates and Blade class components that nothing references carry a `No reference found` badge.
 
-The owners of views are read, never run: `render()`, `->layout()` and `#[Layout]` for Livewire (a component without `render()` gets the view named after it under `livewire.view_path`, a full-page component without a layout gets `livewire.layout`), `render()` for Blade components, `$view` for Filament classes, `content()` / `build()` / `toMail()` for mail, `Route::view()` and `Route::livewire()` for routes and `view()` / `View::make()` / `->view()` in controller actions.
+The owners of views are read, never run: `render()`, `->layout()` and `#[Layout]` for Livewire (a component without `render()` gets the view named after it under `livewire.view_path`, a full-page component without a layout gets the configured one: `livewire.component_layout` on Livewire 4, `livewire.layout` on Livewire 3), `render()` for Blade components, `$view` for Filament classes, `content()` / `build()` / `toMail()` for mail, `Route::view()` and `Route::livewire()` for routes and `view()` / `View::make()` / `->view()` in controller actions.
 
-In the HTTP scope, views stay leaves: a route shows the page it renders, not the layout and partials behind it. In the Views tree, a template shared by several pages is unfolded once; its other occurrences are marked as already shown.
+A Filament widget embedded with `@livewire(StatsWidget::class)` points to its Filament node when it declares its own view.
+
+In the HTTP scope, views stay leaves: a route shows the page it renders, not the layout and partials behind it. In the Views tree, a template shared by several pages is not unfolded twice at the same depth; its other occurrences are marked as already shown.
 
 ### Detection limits
 

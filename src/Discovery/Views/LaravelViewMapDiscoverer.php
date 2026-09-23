@@ -18,8 +18,10 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewOwnerData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
 use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
+use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
 use LaBoiteACode\DependencyGraph\Support\PackagePath;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
+use Throwable;
 
 /**
  * Reads every application template once, resolves what it references,
@@ -43,6 +45,9 @@ final class LaravelViewMapDiscoverer implements CollectsDiscoveryWarnings, ViewM
 
     /** @var array<string, true> */
     private array $livewireViews = [];
+
+    /** @var list<DiscoveryWarning> */
+    private array $warnings = [];
 
     public function __construct(
         private readonly BladeTemplateScanner $scanner,
@@ -88,10 +93,13 @@ final class LaravelViewMapDiscoverer implements CollectsDiscoveryWarnings, ViewM
         // Owners may render package views nothing else references.
         $this->scanPackageViews($context);
 
+        $filamentComponents = $this->linkFilamentComponents($owners);
         $externals = [];
 
         foreach ($this->resolver->externals() as $id => $resolution) {
-            $externals[$id] = new ExternalViewData($id, $resolution->value, $resolution->package, $resolution->missing);
+            if (! isset($filamentComponents[$id])) {
+                $externals[$id] = new ExternalViewData($id, $resolution->value, $resolution->package, $resolution->missing);
+            }
         }
 
         ksort($externals, SORT_STRING);
@@ -107,7 +115,53 @@ final class LaravelViewMapDiscoverer implements CollectsDiscoveryWarnings, ViewM
 
     public function pullWarnings(): array
     {
-        return $this->scanner->pullWarnings();
+        $warnings = [...$this->warnings, ...$this->scanner->pullWarnings()];
+        $this->warnings = [];
+
+        return $warnings;
+    }
+
+    /**
+     * Filament widgets are Livewire components: a template embedding one
+     * with @livewire points to the Filament node when the class declares
+     * its own view, instead of an external leaf.
+     *
+     * @param  list<ViewOwnerData>  $owners
+     * @return array<string, string> External id to Filament component id.
+     */
+    private function linkFilamentComponents(array $owners): array
+    {
+        $linked = [];
+
+        foreach ($owners as $owner) {
+            if ($owner->ownerType === ViewOwnerData::TYPE_FILAMENT && $owner->class !== null) {
+                $linked[StableIdentifier::externalView($owner->class)] = $owner->id;
+            }
+        }
+
+        if ($linked === []) {
+            return [];
+        }
+
+        foreach ($this->views as $id => $view) {
+            $references = [];
+            $changed = false;
+
+            foreach ($view->references as $reference) {
+                if ($reference->targetId !== null && isset($linked[$reference->targetId])) {
+                    $reference = new ViewReference($reference->type, $reference->written, $reference->directive, $linked[$reference->targetId], $reference->line);
+                    $changed = true;
+                }
+
+                $references[] = $reference;
+            }
+
+            if ($changed) {
+                $this->views[$id] = $view->withReferences($references);
+            }
+        }
+
+        return $linked;
     }
 
     private function scan(string $name, string $path, DiscoveryContext $context): void
@@ -196,13 +250,23 @@ final class LaravelViewMapDiscoverer implements CollectsDiscoveryWarnings, ViewM
      */
     private function routesAndControllers(DiscoveryContext $context): HttpMapData
     {
-        $routes = $this->routes->discover($context);
-        $this->routes->pullWarnings();
+        try {
+            $routes = $this->routes->discover($context);
+            $this->routes->pullWarnings();
 
-        return new HttpMapData(
-            routes: $routes,
-            controllers: $this->controllers->discover($routes, $context, []),
-        );
+            return new HttpMapData(
+                routes: $routes,
+                controllers: $this->controllers->discover($routes, $context, []),
+            );
+        } catch (Throwable $exception) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'view_owner_discovery',
+                message: sprintf('Routes and controllers could not be read for the view map: %s', $exception->getMessage()),
+                exceptionClass: $exception::class,
+            );
+
+            return new HttpMapData;
+        }
     }
 
     /**
@@ -234,9 +298,11 @@ final class LaravelViewMapDiscoverer implements CollectsDiscoveryWarnings, ViewM
             ) !== [];
 
             $kind = match (true) {
-                isset($this->livewireViews[$id]), $rendered([ViewOwnerData::TYPE_LIVEWIRE], 'render') => ViewData::KIND_LIVEWIRE,
+                isset($this->livewireViews[$id]),
+                $rendered([ViewOwnerData::TYPE_LIVEWIRE], 'render'),
+                $rendered([ViewOwnerData::TYPE_ROUTE], 'Route::livewire') => ViewData::KIND_LIVEWIRE,
                 isset($this->extended[$id]),
-                $rendered([ViewOwnerData::TYPE_LIVEWIRE], 'layout'),
+                $rendered([ViewOwnerData::TYPE_LIVEWIRE, ViewOwnerData::TYPE_ROUTE], 'layout'),
                 preg_match('/(^|\.)layouts?(\.|$)/', $view->name) === 1 => ViewData::KIND_LAYOUT,
                 str_starts_with($view->name, 'components.') => ViewData::KIND_COMPONENT,
                 $rendered([ViewOwnerData::TYPE_MAILABLE, ViewOwnerData::TYPE_NOTIFICATION]) => ViewData::KIND_MAIL,

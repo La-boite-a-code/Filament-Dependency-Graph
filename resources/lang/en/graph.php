@@ -132,7 +132,7 @@ return [
     'tree' => [
         'already_shown' => 'already shown',
         'undispatched_events' => 'Events without a detected dispatcher',
-        'unreferenced_views' => 'Views without a detected reference',
+        'unreferenced_views' => 'Views and components without a detected reference',
         'groups' => [
             'routes' => 'Routes and controllers',
             'livewire' => 'Livewire',

@@ -26,6 +26,8 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
      */
     private ?ApplicationSnapshot $snapshot = null;
 
+    private ?string $snapshotKey = null;
+
     public function __construct(
         private readonly DiscoverApplication $discoverApplication,
         private readonly BuildDependencyGraph $buildGraph,
@@ -41,7 +43,17 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
             return $this->discoverApplication->execute($context);
         }
 
-        return $this->snapshot ??= $this->discoverApplication->execute();
+        // Keyed by the cache key, so a configuration change in the same
+        // request reads the matching snapshot.
+        $context = $this->discoverApplication->defaultContext();
+        $key = (string) $this->discoverApplication->cacheKey($context);
+
+        if ($this->snapshot === null || $this->snapshotKey !== $key) {
+            $this->snapshot = $this->discoverApplication->execute($context);
+            $this->snapshotKey = $key;
+        }
+
+        return $this->snapshot;
     }
 
     public function graph(?GraphQuery $query = null): Graph
@@ -71,6 +83,7 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
     public function clearCache(): void
     {
         $this->snapshot = null;
+        $this->snapshotKey = null;
         $this->clearGraphCache->execute();
     }
 

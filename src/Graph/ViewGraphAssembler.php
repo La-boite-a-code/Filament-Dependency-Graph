@@ -28,12 +28,12 @@ final class ViewGraphAssembler
     ];
 
     /**
-     * Owners whose node is built by another assembler.
+     * Owners whose node is always built by another assembler. Routes,
+     * controllers, mailables and notifications get a node here too, so the
+     * Views scope works without the HTTP map; the HTTP nodes win otherwise.
      */
     private const OWNERS_WITH_NODES = [
         ViewOwnerData::TYPE_LIVEWIRE,
-        ViewOwnerData::TYPE_ROUTE,
-        ViewOwnerData::TYPE_CONTROLLER,
     ];
 
     public function __construct(

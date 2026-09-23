@@ -24,7 +24,10 @@ it('produces a graph payload for the frontend', function (): void {
 
     expect($payload['error'])->toBeNull()
         ->and($payload['stats']['nodes'])->toBeGreaterThan(0)
-        ->and($payload['graph']['nodes'][0])->toHaveKeys(['id', 'type', 'label', 'badges']);
+        ->and($payload['graph']['nodes'][0])->toHaveKeys(['id', 'type', 'label', 'badges'])
+        // Only what the renderer draws: the inspector reads the rest server side.
+        ->and(array_keys($payload['graph']['nodes'][0]['metadata']))->toBe(['kind'])
+        ->and(array_keys($payload['graph']['edges'][0]))->toBe(['id', 'type', 'source', 'target', 'label']);
 });
 
 it('opens the inspector for a selected model node', function (): void {

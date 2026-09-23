@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LaBoiteACode\DependencyGraph\Discovery\Views;
+namespace LaBoiteACode\DependencyGraph\Discovery\Support;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Str;
@@ -39,6 +39,52 @@ final class LivewireAdapter
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * The name Livewire gives a component class: its registered alias, or
+     * the name derived from its namespace.
+     */
+    public function name(string $class): ?string
+    {
+        try {
+            if ($this->container->bound('livewire.finder')) {
+                $name = $this->container->make('livewire.finder')->normalizeName(ltrim($class, '\\'));
+
+                return is_string($name) && $name !== '' ? $name : null;
+            }
+
+            $registryClass = 'Livewire\\Mechanisms\\ComponentRegistry';
+
+            if (! class_exists($registryClass) || ! $this->container->bound($registryClass)) {
+                return null;
+            }
+
+            $registry = $this->container->make($registryClass);
+
+            if (! property_exists($registry, 'aliases')) {
+                return null;
+            }
+
+            $aliases = (new ReflectionProperty($registry, 'aliases'))->getValue($registry);
+            $name = is_array($aliases) ? array_search(ltrim($class, '\\'), $aliases, true) : false;
+
+            return is_string($name) ? $name : null;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * The layout of full-page components that do not declare one:
+     * component_layout on Livewire 4, layout on Livewire 3.
+     */
+    public function defaultLayout(): ?string
+    {
+        $config = $this->container->make('config');
+        $layout = $config->get('livewire.component_layout') ?? $config->get('livewire.layout');
+
+        return is_string($layout) && $layout !== '' ? $layout : null;
     }
 
     /**

@@ -165,3 +165,14 @@ it('builds the Laravel scope exactly as the full graph without its HTTP and view
         ->and($snapshot->views->isEmpty())->toBeFalse()
         ->and($laravel->toArray())->toBe($full->subgraph(array_values($kept))->toArray());
 });
+
+it('builds the Filament scope exactly as it does from the full graph', function (): void {
+    $snapshot = app(ApplicationDiscovery::class)->discover($this->fixtureContext());
+    $builder = app(BuildDependencyGraph::class);
+    $full = app(GraphBuilder::class)->build($snapshot);
+
+    $expected = (fn (Graph $graph): Graph => $this->restrictToFilamentScope($graph))->call($builder, $full);
+    $filament = $builder->execute($snapshot, new GraphQuery(scope: GraphScope::Filament, includeOrphans: true));
+
+    expect($filament->toArray())->toBe($expected->toArray());
+});

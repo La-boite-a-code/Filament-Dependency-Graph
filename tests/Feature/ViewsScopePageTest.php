@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Filament\Facades\Filament;
+use LaBoiteACode\DependencyGraph\Domain\Enums\EdgeType;
+use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Filament\Pages\DependencyGraphPage;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
@@ -46,8 +48,12 @@ it('groups the Views tree by owner and lists unreferenced views', function (): v
         'Filament',
         'Blade components',
         'Mail',
-        'Views without a detected reference',
+        'Views and components without a detected reference',
     ]);
+
+    $unreferenced = collect($tree)->firstWhere('id', 'group:unreferenced-views');
+
+    expect(collect($unreferenced['children'])->pluck('label')->all())->toContain('unused', 'Unused');
 
     $routes = collect($tree)->firstWhere('label', 'Routes and controllers');
     $controller = collect($routes['children'])->firstWhere('label', 'OrderController');
@@ -56,7 +62,7 @@ it('groups the Views tree by owner and lists unreferenced views', function (): v
     expect($index['label'])->toBe('orders.index')
         ->and(collect($index['children'])->pluck('label')->all())->toContain('layouts.app', 'orders.partials.row', 'Alert');
 
-    // Shared templates are unfolded once for the whole tree.
+    // Shared templates are not unfolded again at the same or a lower depth.
     $occurrences = [];
     $walk = function (array $items) use (&$walk, &$occurrences): void {
         foreach ($items as $item) {
@@ -70,7 +76,7 @@ it('groups the Views tree by owner and lists unreferenced views', function (): v
     $walk($tree);
 
     expect(count($occurrences))->toBeGreaterThan(1)
-        ->and(array_filter($occurrences, static fn (bool $shown): bool => ! $shown))->toHaveCount(1);
+        ->and($occurrences)->toContain(true);
 });
 
 it('inspects a view with what it renders and who uses it', function (): void {
@@ -105,4 +111,48 @@ it('hides the Views scope when disabled', function (): void {
         ->assertDontSeeHtml('<option value="views">')
         ->set('scope', 'views')
         ->assertSet('scope', 'filament');
+});
+
+it('unfolds a shared template again when the depth limit cut it short', function (): void {
+    $graph = fakeGraph([
+        fakeNode('route', NodeType::Route, 'GET /a'),
+        fakeNode('view:a', NodeType::View),
+        fakeNode('view:b', NodeType::View),
+        fakeNode('view:layout', NodeType::View),
+        fakeNode('view:nav', NodeType::View),
+        fakeNode('view:icon', NodeType::View),
+        fakeNode('livewire', NodeType::LivewireComponent, 'Dashboard'),
+    ], [
+        fakeEdge('route', 'view:a', EdgeType::RendersView, 'Route::view'),
+        fakeEdge('view:a', 'view:b', EdgeType::ViewIncludes, '@include'),
+        fakeEdge('view:b', 'view:layout', EdgeType::ViewExtends, '@extends'),
+        fakeEdge('view:layout', 'view:nav', EdgeType::ViewIncludes, '@include'),
+        fakeEdge('view:nav', 'view:icon', EdgeType::ViewIncludes, '@include'),
+        fakeEdge('livewire', 'view:layout', EdgeType::RendersView, 'layout'),
+    ]);
+
+    $tree = (fn (): array => $this->viewsTree($graph, 4))->call(app(DependencyGraphPage::class));
+    $ids = [];
+    $walk = function (array $items) use (&$walk, &$ids): void {
+        foreach ($items as $item) {
+            $ids[] = $item['id'];
+            $walk($item['children']);
+        }
+    };
+    $walk($tree);
+
+    // Under the route, the layout is reached at the depth limit; under the
+    // Livewire component it has room to show its partials.
+    expect($ids)->toContain('view:icon');
+});
+
+it('keeps routes and controllers in the Views tree without the HTTP map', function (): void {
+    config()->set('filament-dependency-graph.http.enabled', false);
+
+    $tree = Livewire::test(DependencyGraphPage::class)->set('scope', 'views')->instance()->getTree();
+    $routes = collect($tree)->firstWhere('id', 'group:routes');
+    $controller = collect($routes['children'] ?? [])->firstWhere('label', 'OrderController');
+
+    expect(collect($routes['children'] ?? [])->pluck('label')->all())->toContain('OrderController', 'GET /about')
+        ->and($controller['children'][0]['label'] ?? null)->toBe('orders.index');
 });

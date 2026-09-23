@@ -397,10 +397,10 @@ final class NodeFactory
     }
 
     /**
-     * Blade class components, Filament classes, and mailables or
-     * notifications only known through the views they render.
-     */
-    /**
+     * Blade class components, Filament classes, and the routes,
+     * controllers, mailables or notifications known through the views they
+     * render when the HTTP map does not describe them.
+     *
      * @param  list<string>  $badges
      */
     public function forViewOwner(ViewOwnerData $owner, array $badges = []): Node
@@ -408,9 +408,19 @@ final class NodeFactory
         $type = match ($owner->ownerType) {
             ViewOwnerData::TYPE_BLADE_COMPONENT => NodeType::BladeComponent,
             ViewOwnerData::TYPE_FILAMENT => NodeType::FilamentComponent,
+            ViewOwnerData::TYPE_ROUTE => NodeType::Route,
+            ViewOwnerData::TYPE_CONTROLLER => NodeType::Controller,
             ViewOwnerData::TYPE_NOTIFICATION => NodeType::Notification,
             default => NodeType::Mailable,
         };
+
+        $route = [];
+
+        if ($owner->ownerType === ViewOwnerData::TYPE_ROUTE) {
+            // The route label reads "GET|POST /uri".
+            [$methods, $uri] = array_pad(explode(' ', $owner->label, 2), 2, '/');
+            $route = ['methods' => explode('|', $methods), 'uri' => ltrim($uri, '/'), 'name' => $owner->detail];
+        }
 
         return new Node(
             id: NodeId::fromString($owner->id),
@@ -424,6 +434,7 @@ final class NodeFactory
                 'owner_type' => $owner->ownerType,
                 'detail' => $owner->detail,
                 'warnings' => $owner->warnings,
+                ...$route,
             ],
             badges: $owner->status->isPartial() ? [...$badges, 'Partial'] : $badges,
             status: $owner->status,
