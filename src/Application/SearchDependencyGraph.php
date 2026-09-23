@@ -117,6 +117,7 @@ final class SearchDependencyGraph
             'panel' => $this->metadataString($node, 'panel_id'),
             'navigation_group' => $this->metadataString($node, 'navigation_group'),
             'namespace' => $this->metadataString($node, 'namespace'),
+            'file' => $this->metadataString($node, 'file'),
             'relation_methods' => implode(' ', $this->relationMethods($graph, $node)),
             'badges' => implode(' ', $node->badges),
         ];

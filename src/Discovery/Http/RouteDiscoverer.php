@@ -13,6 +13,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Routing\ViewController;
 use Illuminate\Support\Str;
 use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
+use LaBoiteACode\DependencyGraph\Discovery\Views\LivewireAdapter;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
@@ -40,6 +41,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
     public function __construct(
         private readonly Router $router,
         private readonly MiddlewareResolver $middleware,
+        private readonly LivewireAdapter $livewire,
     ) {}
 
     /**
@@ -109,10 +111,21 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
         $controllerClass = null;
         $controllerMethod = null;
         $livewireClass = null;
+        $livewireComponent = null;
         $file = null;
         $warnings = [];
+        $routed = $route->action['livewire_component'] ?? null;
 
-        if ($uses instanceof Closure) {
+        if ($routed !== null) {
+            // Route::livewire() (Livewire 4) hands the component to Livewire's
+            // own page controller: the component is the action.
+            $actionType = RouteData::ACTION_LIVEWIRE;
+            [$livewireClass, $livewireComponent] = $this->routedLivewire($routed);
+
+            if (! $context->includeVendorRoutes && $livewireClass !== null && ! $this->isApplicationAction($actionType, $livewireClass, $context)) {
+                return null;
+            }
+        } elseif ($uses instanceof Closure) {
             $actionType = RouteData::ACTION_CLOSURE;
             $path = (new ReflectionFunction($uses))->getFileName();
 
@@ -171,7 +184,33 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
             file: $file,
             status: $warnings === [] ? DiscoveryStatus::Complete : DiscoveryStatus::Partial,
             warnings: $warnings,
+            livewireComponent: $livewireComponent,
         );
+    }
+
+    /**
+     * The class of a component routed with Route::livewire(), or its name
+     * when it is a single or multi-file component without a class.
+     *
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function routedLivewire(mixed $component): array
+    {
+        if (is_object($component)) {
+            $class = $component::class;
+
+            return [str_contains($class, '@anonymous') ? null : $class, null];
+        }
+
+        if (! is_string($component)) {
+            return [null, null];
+        }
+
+        $resolved = $this->livewire->resolve($component);
+
+        return $resolved !== null && $resolved['type'] === 'class'
+            ? [$resolved['value'], null]
+            : [null, $component];
     }
 
     private function isExcluded(Route $route, DiscoveryContext $context): bool

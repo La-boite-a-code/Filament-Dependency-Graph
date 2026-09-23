@@ -55,18 +55,6 @@ class DependencyGraphPage extends Page implements HasTable
 
     private const VIEW_TABLE_DATASETS = ['views', 'components', 'externals', 'livewire_components'];
 
-    /**
-     * Edges the Views tree follows: rendering and template references.
-     */
-    private const VIEW_TREE_EDGES = [
-        EdgeType::RendersView,
-        EdgeType::ViewExtends,
-        EdgeType::ViewIncludes,
-        EdgeType::ViewUsesComponent,
-        EdgeType::ViewRendersLivewire,
-        EdgeType::ViewReferencesDynamic,
-    ];
-
     protected string $view = 'filament-dependency-graph::page';
 
     protected static ?string $slug = 'dependency-graph';
@@ -906,7 +894,7 @@ class DependencyGraphPage extends Page implements HasTable
                     ->label(__('filament-dependency-graph::graph.table.used_in_views'))
                     ->numeric()
                     ->sortable()
-                    ->toggleable(),
+                    ->visible(fn (): bool => $this->currentScope() === GraphScope::Views),
                 $this->statusTableColumn(),
             ],
             'relations' => [
@@ -1227,7 +1215,7 @@ class DependencyGraphPage extends Page implements HasTable
     {
         $usedBy = static fn (Node $node): int => count(array_filter(
             $graph->incomingEdges($node->id),
-            static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true),
+            static fn (Edge $edge): bool => ($edge->type === EdgeType::RendersView || $edge->type->isViewReference()),
         ));
 
         $views = [];
@@ -1243,7 +1231,7 @@ class DependencyGraphPage extends Page implements HasTable
                 'used_by' => $usedBy($node),
                 'uses' => count(array_filter(
                     $graph->outgoingEdges($node->id),
-                    static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true),
+                    static fn (Edge $edge): bool => ($edge->type === EdgeType::RendersView || $edge->type->isViewReference()),
                 )),
                 'status' => $node->status->value,
             ];
@@ -1812,7 +1800,7 @@ class DependencyGraphPage extends Page implements HasTable
 
     protected function viewsTreeFilter(): Closure
     {
-        return static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true);
+        return static fn (Edge $edge): bool => ($edge->type === EdgeType::RendersView || $edge->type->isViewReference());
     }
 
     /**
@@ -1831,7 +1819,8 @@ class DependencyGraphPage extends Page implements HasTable
         }
 
         return static function (Edge $edge) use ($graph, $action): bool|string {
-            if ($edge->type === EdgeType::ModelRelation) {
+            // Views are leaves of the HTTP map.
+            if ($edge->type === EdgeType::ModelRelation || $edge->type->isViewReference()) {
                 return false;
             }
 

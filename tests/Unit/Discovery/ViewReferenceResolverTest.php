@@ -5,15 +5,19 @@ declare(strict_types=1);
 use LaBoiteACode\DependencyGraph\Discovery\Views\BladeTemplateScanner;
 use LaBoiteACode\DependencyGraph\Discovery\Views\ViewReferenceResolver;
 use LaBoiteACode\DependencyGraph\Discovery\Views\ViewResolution;
+use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Alert;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Shop\Price;
 
-function preparedResolver(mixed ...$overrides): ViewReferenceResolver
+/**
+ * @param  list<string>  $livewireIds
+ */
+function preparedResolver(array $livewireIds = [], mixed ...$overrides): ViewReferenceResolver
 {
     $context = test()->fixtureContext(...$overrides);
     $resolver = app(ViewReferenceResolver::class);
-    $resolver->prepare(app(BladeTemplateScanner::class)->templates($context), $context);
+    $resolver->prepare(app(BladeTemplateScanner::class)->templates($context), $context, $livewireIds);
 
     return $resolver;
 }
@@ -63,7 +67,7 @@ it('resolves Blade components like the Blade compiler', function (): void {
 });
 
 it('resolves Livewire components without instantiating them', function (): void {
-    $resolver = preparedResolver();
+    $resolver = preparedResolver([StableIdentifier::livewireComponent(StandaloneCounter::class)]);
 
     expect($resolver->livewire('standalone-counter'))
         ->kind->toBe(ViewResolution::LIVEWIRE)
@@ -72,4 +76,20 @@ it('resolves Livewire components without instantiating them', function (): void 
         ->kind->toBe(ViewResolution::LIVEWIRE)
         ->and($resolver->livewire('unknown-component'))
         ->missing->toBeTrue();
+});
+
+it('keeps Livewire classes without a node as external leaves', function (): void {
+    expect(preparedResolver()->livewire('standalone-counter'))
+        ->kind->toBe(ViewResolution::EXTERNAL)
+        ->value->toBe(StandaloneCounter::class)
+        ->missing->toBeFalse();
+});
+
+it('records the externals and package views it hands out', function (): void {
+    $resolver = preparedResolver(explorePackageViews: true);
+    $resolver->view('orders.partials.missing');
+    $resolver->view('filament-dependency-graph::page');
+
+    expect(array_keys($resolver->externals()))->toBe(['external-view:orders.partials.missing'])
+        ->and(array_keys($resolver->packageViews()))->toBe(['filament-dependency-graph::page']);
 });

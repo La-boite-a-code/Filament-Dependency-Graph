@@ -186,6 +186,7 @@ final class NodeFactory
                 'controller_class' => $route->controllerClass,
                 'controller_method' => $route->controllerMethod,
                 'livewire_class' => $route->livewireClass,
+                'livewire_component' => $route->livewireComponent,
                 'view' => $route->view,
                 'middleware' => $route->middleware,
                 'resolved_middleware' => $route->resolvedMiddleware,
@@ -399,7 +400,10 @@ final class NodeFactory
      * Blade class components, Filament classes, and mailables or
      * notifications only known through the views they render.
      */
-    public function forViewOwner(ViewOwnerData $owner): Node
+    /**
+     * @param  list<string>  $badges
+     */
+    public function forViewOwner(ViewOwnerData $owner, array $badges = []): Node
     {
         $type = match ($owner->ownerType) {
             ViewOwnerData::TYPE_BLADE_COMPONENT => NodeType::BladeComponent,
@@ -421,7 +425,7 @@ final class NodeFactory
                 'detail' => $owner->detail,
                 'warnings' => $owner->warnings,
             ],
-            badges: $owner->status->isPartial() ? ['Partial'] : [],
+            badges: $owner->status->isPartial() ? [...$badges, 'Partial'] : $badges,
             status: $owner->status,
         );
     }

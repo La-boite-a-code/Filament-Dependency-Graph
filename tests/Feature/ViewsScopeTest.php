@@ -14,6 +14,7 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\FilamentViews\Widgets\StatsWidge
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\OrderDashboard;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Alert;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Unused;
 
 function viewsGraph(mixed ...$overrides): Graph
 {
@@ -43,9 +44,9 @@ function targetsOf(Graph $graph, string $sourceId, EdgeType $type): array
 it('shows every template, what renders it and what it renders', function (): void {
     $graph = viewsGraph();
 
-    expect(count($graph->nodesOfType(NodeType::View)))->toBe(15)
+    expect(count($graph->nodesOfType(NodeType::View)))->toBe(16)
         ->and(count($graph->nodesOfType(NodeType::FilamentComponent)))->toBe(2)
-        ->and(count($graph->nodesOfType(NodeType::DynamicView)))->toBe(2)
+        ->and(count($graph->nodesOfType(NodeType::DynamicView)))->toBe(4)
         ->and($graph->nodesOfType(NodeType::Model))->toBe([])
         ->and($graph->nodesOfType(NodeType::Resource))->toBe([])
         ->and(targetsOf($graph, 'view:orders.index', EdgeType::ViewIncludes))->toBe([
@@ -96,3 +97,10 @@ it('leaves the Filament and Laravel scopes untouched by the view map', function 
 
     expect($build(true))->toBe($build(false));
 })->with([GraphScope::Filament, GraphScope::Laravel]);
+
+it('keeps unused Blade components visible and flags them', function (): void {
+    $graph = viewsGraph();
+
+    expect($graph->node(StableIdentifier::bladeComponent(Unused::class))?->badges)->toBe(['No reference found'])
+        ->and($graph->node(StableIdentifier::bladeComponent(Alert::class))?->badges)->toBe([]);
+});

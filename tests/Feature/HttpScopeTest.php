@@ -98,6 +98,8 @@ it('shows rendered views as leaves of the HTTP scope, per action', function (): 
 
     expect($graph->nodesOfType(NodeType::ExternalView))->toBe([])
         ->and($graph->nodesOfType(NodeType::BladeComponent))->toBe([])
+        // orders.index extends layouts.app, both rendered: no edge between them.
+        ->and(array_filter($graph->edges, static fn ($edge): bool => $edge->type->isViewReference()))->toBe([])
         ->and(labelsOfType(httpGraph(middleware: 'auth'), NodeType::View))->toBe(['mail.order-shipped', 'mail.order-updated']);
 });
 

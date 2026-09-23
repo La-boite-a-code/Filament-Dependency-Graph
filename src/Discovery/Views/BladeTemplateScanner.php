@@ -8,8 +8,10 @@ use FilesystemIterator;
 use Illuminate\Support\Str;
 use Illuminate\View\Factory;
 use Illuminate\View\FileViewFinder;
+use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
+use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -20,7 +22,7 @@ use Throwable;
  * extracted with their line; nothing is compiled, so application-defined
  * directives and precompilers never run.
  */
-final class BladeTemplateScanner
+final class BladeTemplateScanner implements CollectsDiscoveryWarnings
 {
     /**
      * Livewire 4 marks single-file components with this character, possibly
@@ -29,6 +31,7 @@ final class BladeTemplateScanner
     private const ZAP = '/⚡[\x{FE0E}\x{FE0F}]?/u';
 
     private const DIRECTIVES = [
+        'extendsFirst' => ViewReference::TYPE_EXTENDS,
         'extends' => ViewReference::TYPE_EXTENDS,
         'includeUnless' => ViewReference::TYPE_INCLUDE,
         'includeWhen' => ViewReference::TYPE_INCLUDE,
@@ -36,12 +39,16 @@ final class BladeTemplateScanner
         'includeIf' => ViewReference::TYPE_INCLUDE,
         'include' => ViewReference::TYPE_INCLUDE,
         'each' => ViewReference::TYPE_INCLUDE,
+        'componentFirst' => ViewReference::TYPE_INCLUDE,
         'component' => ViewReference::TYPE_INCLUDE,
         'livewire' => ViewReference::TYPE_LIVEWIRE,
     ];
 
     /** Livewire tags that are not components. */
     private const LIVEWIRE_NON_COMPONENTS = ['styles', 'scripts'];
+
+    /** @var list<DiscoveryWarning> */
+    private array $warnings = [];
 
     public function __construct(
         private readonly Factory $views,
@@ -56,6 +63,9 @@ final class BladeTemplateScanner
     public function templates(DiscoveryContext $context): array
     {
         $templates = [];
+        // Livewire registers folders nested in resources/views as view
+        // locations: a file is only listed under the first root holding it.
+        $seen = [];
 
         foreach ($this->viewPaths() as $root) {
             $root = rtrim($root, '/\\');
@@ -64,28 +74,43 @@ final class BladeTemplateScanner
                 continue;
             }
 
-            $files = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
-            );
+            try {
+                $files = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+                );
 
-            foreach ($files as $file) {
-                if (! $file instanceof SplFileInfo || ! str_ends_with($file->getFilename(), '.blade.php')) {
-                    continue;
+                foreach ($files as $file) {
+                    if (! $file instanceof SplFileInfo || ! str_ends_with($file->getFilename(), '.blade.php')) {
+                        continue;
+                    }
+
+                    $real = $file->getRealPath() ?: $file->getPathname();
+
+                    if (isset($seen[$real])) {
+                        continue;
+                    }
+
+                    $seen[$real] = true;
+                    $relative = substr($file->getPathname(), strlen($root) + 1);
+
+                    if (! $context->includeVendorViewOverrides && str_starts_with($relative, 'vendor' . DIRECTORY_SEPARATOR)) {
+                        continue;
+                    }
+
+                    $name = $this->nameFromPath($relative);
+
+                    if ($context->excludedViews !== [] && Str::is($context->excludedViews, $name)) {
+                        continue;
+                    }
+
+                    $templates[$name] ??= $file->getPathname();
                 }
-
-                $relative = substr($file->getPathname(), strlen($root) + 1);
-
-                if (! $context->includeVendorViewOverrides && str_starts_with($relative, 'vendor' . DIRECTORY_SEPARATOR)) {
-                    continue;
-                }
-
-                $name = $this->nameFromPath($relative);
-
-                if ($context->excludedViews !== [] && Str::is($context->excludedViews, $name)) {
-                    continue;
-                }
-
-                $templates[$name] ??= $file->getPathname();
+            } catch (Throwable $exception) {
+                $this->warnings[] = new DiscoveryWarning(
+                    type: 'view_path_not_readable',
+                    message: sprintf('The view path [%s] could not be read: %s', $root, $exception->getMessage()),
+                    exceptionClass: $exception::class,
+                );
             }
         }
 
@@ -124,7 +149,15 @@ final class BladeTemplateScanner
      */
     public function isLivewireSingleFile(string $contents): bool
     {
-        return preg_match('/<\?php.*new\s+class\b.*extends\s+[\\\\\w]*Component\b.*\?>/s', $contents) === 1;
+        return preg_match('/<\?php.*new\s+(?:#\[[^\]]*\]\s*)*class\b.*extends\s+[\\\\\w]*Component\b/s', $contents) === 1;
+    }
+
+    public function pullWarnings(): array
+    {
+        $warnings = $this->warnings;
+        $this->warnings = [];
+
+        return $warnings;
     }
 
     /**
@@ -159,7 +192,9 @@ final class BladeTemplateScanner
      */
     private function directives(string $contents): array
     {
-        $pattern = '/(?<!@)@(' . implode('|', array_keys(self::DIRECTIVES)) . ')\s*\(/';
+        // Blade only compiles a directive that does not follow a word
+        // character or another @, with blanks but no line break before "(".
+        $pattern = '/(?<![\w@])@(' . implode('|', array_keys(self::DIRECTIVES)) . ')[ \t]*\(/';
         $references = [];
 
         preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER);
@@ -173,7 +208,7 @@ final class BladeTemplateScanner
 
             $candidates = match ($directive) {
                 'includeWhen', 'includeUnless' => [$arguments[1] ?? null],
-                'includeFirst' => $this->arrayItems($arguments[0] ?? null),
+                'includeFirst', 'extendsFirst', 'componentFirst' => $this->arrayItems($arguments[0] ?? null),
                 'each' => [$arguments[0] ?? null, ...(isset($arguments[3]) && ! str_contains($arguments[3], 'raw|') ? [$arguments[3]] : [])],
                 default => [$arguments[0] ?? null],
             };
@@ -183,10 +218,19 @@ final class BladeTemplateScanner
                     continue;
                 }
 
-                $written = $this->literal($argument) ?? ($directive === 'livewire' ? $this->classConstant($argument) : null);
+                $literal = $this->literal($argument);
+                $class = $literal === null && in_array($directive, ['livewire', 'component', 'componentFirst'], true)
+                    ? $this->classConstant($argument)
+                    : null;
+                $written = $literal ?? $class;
 
                 $references[] = [
-                    'type' => $written === null ? ViewReference::TYPE_DYNAMIC : $type,
+                    'type' => match (true) {
+                        $written === null => ViewReference::TYPE_DYNAMIC,
+                        // @component(Alert::class) renders a class component.
+                        $class !== null && $directive !== 'livewire' => ViewReference::TYPE_COMPONENT,
+                        default => $type,
+                    },
                     'written' => $written,
                     'directive' => '@' . $directive,
                     'expression' => $written === null ? trim($argument) : null,
@@ -225,13 +269,16 @@ final class BladeTemplateScanner
             $directive = '<' . $prefix . $name . '>';
 
             if ($name === 'dynamic-component' || ($livewire && $name === 'is')) {
-                preg_match('/:?component\s*=\s*"([^"]*)"/', $attributes, $component);
+                $matched = preg_match('/(?<![\w-])(:?)(?:component|is)\s*=\s*"([^"]*)"/', $attributes, $component) === 1;
+                $value = $matched ? $component[2] : '';
+                // component="alert" without a colon is a plain string.
+                $static = $matched && $component[1] === '' && $value !== '';
 
                 $references[] = [
-                    'type' => ViewReference::TYPE_DYNAMIC,
-                    'written' => null,
+                    'type' => $static ? ($livewire ? ViewReference::TYPE_LIVEWIRE : ViewReference::TYPE_COMPONENT) : ViewReference::TYPE_DYNAMIC,
+                    'written' => $static ? $value : null,
                     'directive' => $directive,
-                    'expression' => $component[1] ?? '',
+                    'expression' => $static ? null : $value,
                     'line' => $line,
                 ];
 

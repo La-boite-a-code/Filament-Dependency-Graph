@@ -42,6 +42,7 @@ final readonly class RouteData
         public ?string $file,
         public DiscoveryStatus $status,
         public array $warnings,
+        public ?string $livewireComponent = null,
     ) {}
 
     public function label(): string
@@ -58,7 +59,7 @@ final readonly class RouteData
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{id: string, methods: list<string>, uri: string, name: string|null, domain: string|null, action_type: string, controller_class: string|null, controller_method: string|null, livewire_class: string|null, view: string|null, middleware: list<string>, resolved_middleware: list<string>, bound_parameters: array<string, string>, file: string|null, status: string, warnings: list<string>} $data */
+        /** @var array{id: string, methods: list<string>, uri: string, name: string|null, domain: string|null, action_type: string, controller_class: string|null, controller_method: string|null, livewire_class: string|null, view: string|null, middleware: list<string>, resolved_middleware: list<string>, bound_parameters: array<string, string>, file: string|null, status: string, warnings: list<string>, livewire_component?: string|null} $data */
         return new self(
             id: $data['id'],
             methods: $data['methods'],
@@ -76,6 +77,7 @@ final readonly class RouteData
             file: $data['file'],
             status: DiscoveryStatus::from($data['status']),
             warnings: $data['warnings'],
+            livewireComponent: $data['livewire_component'] ?? null,
         );
     }
 
@@ -101,6 +103,7 @@ final readonly class RouteData
             'file' => $this->file,
             'status' => $this->status->value,
             'warnings' => $this->warnings,
+            'livewire_component' => $this->livewireComponent,
         ];
     }
 }

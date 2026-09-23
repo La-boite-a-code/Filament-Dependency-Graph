@@ -47,6 +47,7 @@ final class LivewireAdapter
     private function resolveWithFinder(string $name): ?array
     {
         $finder = $this->container->make('livewire.finder');
+        $name = $finder->normalizeName($name) ?? $name;
 
         $class = $finder->resolveClassComponentClassName($name);
 
@@ -54,21 +55,23 @@ final class LivewireAdapter
             return ['type' => 'class', 'value' => ltrim($class, '\\')];
         }
 
-        $single = $finder->resolveSingleFileComponentPath($name);
-
-        if (is_string($single) && is_file($single)) {
-            return ['type' => 'file', 'value' => $single];
-        }
-
+        // Livewire looks for a multi-file component before a single file.
         $directory = $finder->resolveMultiFileComponentPath($name);
 
         if (is_string($directory) && is_dir($directory)) {
-            $templates = glob(rtrim($directory, '/\\') . '/*.blade.php') ?: [];
+            $directory = rtrim($directory, '/\\');
+            $basename = (string) preg_replace('/⚡[\x{FE0E}\x{FE0F}]?/u', '', basename($directory));
+            $template = $directory . '/' . $basename . '.blade.php';
+            $templates = is_file($template) ? [$template] : (glob($directory . '/*.blade.php') ?: []);
 
-            return $templates === [] ? null : ['type' => 'file', 'value' => $templates[0]];
+            if ($templates !== []) {
+                return ['type' => 'file', 'value' => $templates[0]];
+            }
         }
 
-        return null;
+        $single = $finder->resolveSingleFileComponentPath($name);
+
+        return is_string($single) && is_file($single) ? ['type' => 'file', 'value' => $single] : null;
     }
 
     /**
@@ -104,7 +107,12 @@ final class LivewireAdapter
             }
         }
 
-        return null;
+        // Volt single-file components live in the Livewire view folder and
+        // are resolved at runtime by a resolver that is never called here.
+        $viewPath = $this->container->make('config')->get('livewire.view_path');
+        $file = is_string($viewPath) ? rtrim($viewPath, '/\\') . '/' . str_replace('.', '/', $name) . '.blade.php' : null;
+
+        return $file !== null && is_file($file) ? ['type' => 'file', 'value' => $file] : null;
     }
 
     private function isComponentClass(string $class): bool

@@ -50,9 +50,16 @@ final class ViewOwnerDiscoverer
         HttpMapData $http,
     ): array {
         $owners = [];
+        $routed = [];
+
+        foreach ($http->routes as $route) {
+            if ($route->livewireClass !== null) {
+                $routed[$route->livewireClass] = true;
+            }
+        }
 
         foreach ($livewireComponents as $component) {
-            $owners[] = $this->livewire($component, $context, $resolver);
+            $owners[] = $this->livewire($component, $resolver, isset($routed[$component->class]));
         }
 
         foreach ($this->bladeComponentClasses($context, $bladeComponentTags) as $class) {
@@ -84,8 +91,19 @@ final class ViewOwnerDiscoverer
         }
 
         foreach ($http->routes as $route) {
-            if ($route->view !== null) {
-                $target = $resolver->view($route->view);
+            $rendered = match (true) {
+                $route->view !== null => new RenderedView($resolver->view($route->view)->id, $route->view, 'Route::view', null),
+                // Single and multi-file components routed with Route::livewire().
+                $route->livewireComponent !== null => new RenderedView(
+                    $resolver->livewire($route->livewireComponent)->id,
+                    $route->livewireComponent,
+                    'Route::livewire',
+                    null,
+                ),
+                default => null,
+            };
+
+            if ($rendered !== null) {
                 $owners[] = new ViewOwnerData(
                     id: $route->id,
                     ownerType: ViewOwnerData::TYPE_ROUTE,
@@ -93,7 +111,7 @@ final class ViewOwnerDiscoverer
                     label: $route->label(),
                     detail: $route->name,
                     file: null,
-                    renders: [new RenderedView($target->id, $route->view, 'Route::view', null)],
+                    renders: [$rendered],
                     status: DiscoveryStatus::Complete,
                     warnings: [],
                 );
@@ -135,7 +153,7 @@ final class ViewOwnerDiscoverer
         return $owners;
     }
 
-    private function livewire(LivewireComponentData $component, DiscoveryContext $context, ViewReferenceResolver $resolver): ViewOwnerData
+    private function livewire(LivewireComponentData $component, ViewReferenceResolver $resolver, bool $routed): ViewOwnerData
     {
         $renders = [];
         $warnings = [];
@@ -164,6 +182,24 @@ final class ViewOwnerDiscoverer
                 if (is_string($layout)) {
                     $renders[] = new RenderedView($resolver->view($layout)->id, $layout, 'layout', null);
                 }
+            }
+
+            // Without render(), Livewire renders the view named after the
+            // component under its view path.
+            if (! $class->hasMethod('render')) {
+                $convention = $resolver->livewireConventionView($component->alias);
+
+                if ($convention !== null) {
+                    $renders[] = new RenderedView($convention->id, $convention->value, 'render', null);
+                }
+            }
+
+            // A full-page component without its own layout uses the
+            // configured one.
+            $layout = config('livewire.layout');
+
+            if ($routed && is_string($layout) && $layout !== '' && array_filter($renders, static fn (RenderedView $view): bool => $view->how === 'layout') === []) {
+                $renders[] = new RenderedView($resolver->view($layout)->id, $layout, 'layout', null);
             }
         } catch (Throwable $exception) {
             $warnings[] = sprintf('The rendered views could not be read: %s', $exception->getMessage());

@@ -171,30 +171,60 @@ final readonly class MethodSource
         $literals = [];
 
         foreach ($this->tokens as $index => $token) {
-            $name = strtolower($token->text);
+            $isFunctionName = $token->is(T_NAME_FULLY_QUALIFIED) && strtolower(ltrim($token->text, '\\')) === 'view';
 
-            if (! $token->is(T_STRING)) {
+            if (! $token->is(T_STRING) && ! $isFunctionName) {
                 continue;
             }
 
+            $name = strtolower(ltrim($token->text, '\\'));
             $isMethodCall = $this->at($index - 1, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR]);
 
             $how = match (true) {
-                in_array($name, ['view', 'markdown', 'text'], true) && $this->at($index + 1, ':') => $name,
+                in_array($name, ['view', 'markdown', 'text', 'html'], true) && $this->at($index + 1, ':') => $name === 'html' ? 'view' : $name,
                 $name === 'view' && $this->at($index + 1, '(') => 'view',
-                in_array($name, ['markdown', 'text', 'layout'], true) && $isMethodCall && $this->at($index + 1, '(') => $name,
-                $name === 'make' && $this->at($index - 1, T_DOUBLE_COLON) && $this->isViewFacade($index - 2) && $this->at($index + 1, '(') => 'view',
+                in_array($name, ['markdown', 'text', 'layout', 'extends'], true) && $isMethodCall && $this->at($index + 1, '(') => $name === 'extends' ? 'layout' : $name,
+                $name === 'make' && $this->at($index + 1, '(') && ($this->isViewFacadeCall($index) || $this->isViewHelperCall($index)) => 'view',
                 default => null,
             };
 
             $literal = $this->tokens[$index + 2] ?? null;
 
-            if ($how !== null && $literal !== null && $literal->is(T_CONSTANT_ENCAPSED_STRING)) {
+            // A literal followed by anything but "," or ")" is only the start
+            // of a computed name: view('orders.' . $type).
+            if (
+                $how !== null
+                && $literal !== null
+                && $literal->is(T_CONSTANT_ENCAPSED_STRING)
+                && $this->at($index + 3, [',', ')'])
+            ) {
                 $literals[] = ['name' => stripcslashes(substr($literal->text, 1, -1)), 'how' => $how, 'line' => $token->line];
             }
         }
 
         return $literals;
+    }
+
+    /**
+     * View::make('x').
+     */
+    private function isViewFacadeCall(int $makeIndex): bool
+    {
+        return $this->at($makeIndex - 1, T_DOUBLE_COLON) && $this->isViewFacade($makeIndex - 2);
+    }
+
+    /**
+     * view()->make('x').
+     */
+    private function isViewHelperCall(int $makeIndex): bool
+    {
+        $helper = $this->tokens[$makeIndex - 4] ?? null;
+
+        return $this->at($makeIndex - 1, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR])
+            && $this->at($makeIndex - 2, ')')
+            && $this->at($makeIndex - 3, '(')
+            && $helper !== null
+            && strtolower(ltrim($helper->text, '\\')) === 'view';
     }
 
     /**

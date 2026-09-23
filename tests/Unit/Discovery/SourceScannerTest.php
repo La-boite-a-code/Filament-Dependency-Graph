@@ -204,5 +204,9 @@ it('lists literal view names with how they are rendered', function (): void {
         'markdown mail.markdown',
         'text mail.text',
         'markdown mail.notification',
+        'view orders.qualified',
+        'view orders.helper',
+        'view mail.html-version',
+        'layout layouts.legacy',
     ]);
 });

@@ -18,6 +18,11 @@ final class ViewsSubject
         $this->layout('layouts.admin');
         (new Content(view: 'mail.html', markdown: 'mail.markdown', text: 'mail.text'));
         $message->markdown('mail.notification');
+        \view('orders.qualified');
+        view()->make('orders.helper');
+        (new Content(html: 'mail.html-version'));
+        $this->extends('layouts.legacy');
+        view('orders.' . $type);
         view($dynamic);
         $collection->view();
         $text = 'view("in.a.string")';

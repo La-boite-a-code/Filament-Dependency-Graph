@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewMapData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\FilamentViews\Widgets\StatsWidget;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Alert;
 
 function viewMap(mixed ...$overrides): ViewMapData
@@ -40,6 +44,7 @@ it('lists every application template with its inferred kind', function (): void 
         'filament.widgets.stats' => 'partial',
         'layouts.app' => 'layout',
         'livewire.order-dashboard' => 'livewire',
+        'livewire.standalone-counter' => 'livewire',
         'mail.order-shipped' => 'mail',
         'mail.order-updated' => 'mail',
         'orders.index' => 'page',
@@ -85,7 +90,13 @@ it('collects package views, missing views and dynamic references', function (): 
         'partials.custom-nav' => 'missing',
         'mail::message' => 'mail',
     ])
-        ->and(array_map(static fn ($dynamic): string => $dynamic->expression, $map->dynamics))->toBe(['$customPartial', '$widget']);
+        ->and(array_map(static fn ($dynamic): string => $dynamic->id . ' ' . $dynamic->expression, $map->dynamics))->toBe([
+            'dynamic-view:orders.index:13 $customPartial',
+            'dynamic-view:orders.index:15 $widget',
+            // Two dynamic names on one line keep distinct identifiers.
+            'dynamic-view:unused:3 $first',
+            'dynamic-view:unused:3.2 $second',
+        ]);
 });
 
 it('finds every owner and the views it renders', function (): void {
@@ -100,6 +111,8 @@ it('finds every owner and the views it renders', function (): void {
 
     expect($owners)->toMatchArray([
         'OrderDashboard' => ['livewire', ['render livewire.order-dashboard', 'layout layouts.app']],
+        // No render(): the view named after the component.
+        'StandaloneCounter' => ['livewire', ['render livewire.standalone-counter']],
         'Alert' => ['blade_component', ['render components.alert']],
         'Price' => ['blade_component', ['render components.shop.price']],
         'Unused' => ['blade_component', []],
@@ -162,4 +175,72 @@ it('maps Livewire 4 single-file components as Livewire views', function (): void
     expect($views['livewire.counter']->kind)->toBe(ViewData::KIND_LIVEWIRE)
         ->and($views['livewire.host']->references[0]->targetId)->toBe('view:livewire.counter')
         ->and($views['livewire.counter']->references[0]->targetId)->toBe('view:components.badge');
+});
+
+it('classifies views rendered by routes and controllers when the HTTP map is off', function (): void {
+    $views = viewsByName(viewMap(discoverHttp: false));
+
+    expect($views['orders.index']->kind)->toBe(ViewData::KIND_PAGE)
+        ->and($views['pages.about']->kind)->toBe(ViewData::KIND_PAGE);
+});
+
+it('reads the package views owners render when package views are explored', function (): void {
+    Route::view('package-page', 'filament-dependency-graph::page');
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(viewsByName(viewMap(explorePackageViews: true)))->toHaveKey('filament-dependency-graph::page')
+        ->and(viewsByName(viewMap()))->not->toHaveKey('filament-dependency-graph::page');
+});
+
+it('maps components routed with Route::livewire()', function (): void {
+    if (! Route::hasMacro('livewire')) {
+        $this->markTestSkipped('Route::livewire() needs Livewire 4.');
+    }
+
+    $path = dirname(__DIR__, 2) . '/Fixtures/views-livewire4';
+    app('view')->getFinder()->addLocation($path);
+    app('livewire.finder')->addLocation(viewPath: $path . '/livewire');
+
+    Route::livewire('counter-page', StandaloneCounter::class);
+    Route::livewire('single-file-counter', 'counter');
+
+    $snapshot = app(ApplicationDiscovery::class)->discover($this->fixtureContext());
+    $routes = [];
+
+    foreach ($snapshot->http->routes as $route) {
+        $routes[$route->uri] = $route;
+    }
+
+    $owners = [];
+
+    foreach ($snapshot->views->owners as $owner) {
+        $owners[$owner->id] = array_map(static fn ($rendered): string => $rendered->how . ' ' . $rendered->targetId, $owner->renders);
+    }
+
+    expect($routes['counter-page'])
+        ->actionType->toBe(RouteData::ACTION_LIVEWIRE)
+        ->livewireClass->toBe(StandaloneCounter::class)
+        ->and($routes['single-file-counter'])
+        ->actionType->toBe(RouteData::ACTION_LIVEWIRE)
+        ->livewireClass->toBeNull()
+        ->livewireComponent->toBe('counter')
+        ->and($owners[$routes['single-file-counter']->id])->toBe(['Route::livewire view:livewire.counter']);
+});
+
+it('never compiles templates, so custom directives and precompilers never run', function (): void {
+    $calls = 0;
+    Blade::precompiler(function (string $value) use (&$calls): string {
+        $calls++;
+
+        return $value;
+    });
+    Blade::directive('customDirective', function () use (&$calls): string {
+        $calls++;
+
+        return '';
+    });
+
+    viewMap();
+
+    expect($calls)->toBe(0);
 });

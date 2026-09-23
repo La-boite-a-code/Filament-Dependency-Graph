@@ -15,14 +15,6 @@ use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
  */
 trait DescribesViewEdges
 {
-    private const VIEW_REFERENCE_EDGES = [
-        EdgeType::ViewExtends,
-        EdgeType::ViewIncludes,
-        EdgeType::ViewUsesComponent,
-        EdgeType::ViewRendersLivewire,
-        EdgeType::ViewReferencesDynamic,
-    ];
-
     /**
      * Views an owner renders: "orders.index (render)".
      *
@@ -58,7 +50,7 @@ trait DescribesViewEdges
         $references = [];
 
         foreach ($graph->outgoingEdges($node->id) as $edge) {
-            if (in_array($edge->type, self::VIEW_REFERENCE_EDGES, true)) {
+            if ($edge->type->isViewReference()) {
                 $references[] = sprintf('%s %s%s', $edge->label, $graph->node($edge->target)->label ?? $edge->target->value, $this->lines($edge));
             }
         }
@@ -76,7 +68,7 @@ trait DescribesViewEdges
         $usages = [];
 
         foreach ($graph->incomingEdges($node->id) as $edge) {
-            if ($edge->type !== EdgeType::RendersView && ! in_array($edge->type, self::VIEW_REFERENCE_EDGES, true)) {
+            if ($edge->type !== EdgeType::RendersView && ! $edge->type->isViewReference()) {
                 continue;
             }
 

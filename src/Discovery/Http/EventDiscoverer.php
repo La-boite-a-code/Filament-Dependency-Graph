@@ -44,7 +44,7 @@ final class EventDiscoverer implements CollectsDiscoveryWarnings
     {
         $classes = [];
 
-        foreach (array_keys($this->rawListeners()) as $event) {
+        foreach (array_keys($this->rawListeners(report: false)) as $event) {
             if ($this->isClassEvent($event)) {
                 $classes[$event] = true;
             }
@@ -236,9 +236,13 @@ final class EventDiscoverer implements CollectsDiscoveryWarnings
     /**
      * @return array<string, list<mixed>>
      */
-    private function rawListeners(): array
+    private function rawListeners(bool $report = true): array
     {
         if (! method_exists($this->dispatcher, 'getRawListeners')) {
+            if (! $report) {
+                return [];
+            }
+
             $this->warnings[] = new DiscoveryWarning(
                 type: 'event_dispatcher_not_readable',
                 message: sprintf('The event dispatcher [%s] does not expose its listeners.', $this->dispatcher::class),

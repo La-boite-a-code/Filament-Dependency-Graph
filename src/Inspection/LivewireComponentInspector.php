@@ -64,16 +64,26 @@ final class LivewireComponentInspector implements NodeInspector
                 new InspectionSection('models', 'Model dependencies', [
                     'Models' => $models,
                 ]),
-                new InspectionSection('views', 'Views', [
-                    'Renders' => $this->renderedViews($node, $graph),
-                    'Used in' => $this->viewUsages($node, $graph),
-                ]),
+                ...$this->viewsSection($node, $graph),
                 new InspectionSection('diagnostics', 'Diagnostics', [
                     'Status' => $node->status->value,
                     'Warnings' => $this->stringList($node, 'warnings'),
                 ]),
             ],
         );
+    }
+
+    /**
+     * @return list<InspectionSection>
+     */
+    private function viewsSection(Node $node, Graph $graph): array
+    {
+        $views = array_filter([
+            'Renders' => $this->renderedViews($node, $graph),
+            'Used in' => $this->viewUsages($node, $graph),
+        ]);
+
+        return $views === [] ? [] : [new InspectionSection('views', 'Views', $views)];
     }
 
     private function string(Node $node, string $key): ?string

@@ -50,9 +50,11 @@ final class ViewGraphAssembler
         $edges = [];
         $referenced = [];
 
+        $ownerNodes = [];
+
         foreach ($views->owners as $owner) {
             if (! in_array($owner->ownerType, self::OWNERS_WITH_NODES, true)) {
-                $nodes[] = $this->nodes->forViewOwner($owner);
+                $ownerNodes[] = $owner;
             }
 
             $grouped = [];
@@ -115,6 +117,12 @@ final class ViewGraphAssembler
 
         foreach ($views->views as $view) {
             $nodes[] = $this->nodes->forView($view, isset($referenced[$view->id]) ? [] : ['No reference found']);
+        }
+
+        foreach ($ownerNodes as $owner) {
+            // A Blade component only exists through the tags using it.
+            $unused = $owner->ownerType === ViewOwnerData::TYPE_BLADE_COMPONENT && ! isset($referenced[$owner->id]);
+            $nodes[] = $this->nodes->forViewOwner($owner, $unused ? ['No reference found'] : []);
         }
 
         foreach ($views->externals as $external) {

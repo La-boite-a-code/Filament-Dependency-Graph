@@ -283,29 +283,31 @@ final class BuildDependencyGraph
             }
         }
 
-        return $graph->subgraph(array_keys($keep));
+        // Views stay leaves: the references between two kept views are dropped.
+        $edgeIds = [];
+
+        foreach ($graph->edges as $edge) {
+            if (! $edge->type->isViewReference()) {
+                $edgeIds[] = $edge->id->value;
+            }
+        }
+
+        return $graph->subgraph(array_keys($keep), $edgeIds);
     }
 
     /**
-     * The Views scope starts from every application view and every owner
-     * rendering one, and follows the view edges down to components,
+     * The Views scope starts from every application view, Blade component
+     * and Filament class, and every owner rendering a view, and follows the
+     * view edges down to components,
      * Livewire components, package views and dynamic references.
      */
     private function restrictToViewsScope(Graph $graph): Graph
     {
-        $followed = [
-            EdgeType::RendersView,
-            EdgeType::ViewExtends,
-            EdgeType::ViewIncludes,
-            EdgeType::ViewUsesComponent,
-            EdgeType::ViewRendersLivewire,
-            EdgeType::ViewReferencesDynamic,
-        ];
-
+        $followed = [EdgeType::RendersView, ...EdgeType::viewReferences()];
         $queue = [];
 
         foreach ($graph->nodes as $node) {
-            if ($node->type === NodeType::View) {
+            if (in_array($node->type, [NodeType::View, NodeType::BladeComponent, NodeType::FilamentComponent], true)) {
                 $queue[] = $node->id->value;
 
                 continue;

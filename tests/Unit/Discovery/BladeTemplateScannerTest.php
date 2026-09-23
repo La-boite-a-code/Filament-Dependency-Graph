@@ -96,3 +96,11 @@ it('lists the application templates of the view paths', function (): void {
     expect(array_keys($templates))->toContain('layouts.app', 'orders.index', 'components.shop.price', 'mail.order-shipped')
         ->not->toContain('unused');
 });
+
+it('lists a template once when view roots are nested', function (): void {
+    app('view')->getFinder()->addLocation(dirname(__DIR__, 2) . '/Fixtures/views/components');
+
+    expect(app(BladeTemplateScanner::class)->templates(test()->fixtureContext()))
+        ->toHaveKey('components.alert')
+        ->not->toHaveKey('alert');
+});

@@ -117,6 +117,7 @@ abstract class TestCase extends Orchestra
             ]);
 
             $config->set('view.paths', [__DIR__ . '/Fixtures/views']);
+            $config->set('livewire.view_path', __DIR__ . '/Fixtures/views/livewire');
             $config->set('filament-dependency-graph.views.blade_component_paths', [__DIR__ . '/Fixtures/View/Components']);
             $config->set('filament-dependency-graph.views.filament_paths', [__DIR__ . '/Fixtures/FilamentViews']);
             $config->set('filament-dependency-graph.views.mail_paths', [
