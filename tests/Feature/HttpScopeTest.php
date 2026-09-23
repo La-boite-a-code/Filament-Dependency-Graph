@@ -103,8 +103,8 @@ it('merges the actions of one controller into a single edge per target', functio
 it('flags events that nothing in the application dispatches', function (): void {
     $graph = httpGraph();
 
-    expect($graph->node(StableIdentifier::event(OrderArchived::class))->badges)->toContain('Not dispatched')
-        ->and($graph->node(StableIdentifier::event(OrderPlaced::class))->badges)->not->toContain('Not dispatched');
+    expect($graph->node(StableIdentifier::event(OrderArchived::class))->badges)->toContain('No dispatcher found')
+        ->and($graph->node(StableIdentifier::event(OrderPlaced::class))->badges)->not->toContain('No dispatcher found');
 });
 
 it('filters routes by middleware and keeps only what they reach', function (): void {

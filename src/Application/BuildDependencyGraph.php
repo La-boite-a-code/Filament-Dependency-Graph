@@ -254,8 +254,8 @@ final class BuildDependencyGraph
         // controller is.
         $routedMethods = [];
 
-        while ($queue !== []) {
-            $currentId = array_shift($queue);
+        for ($cursor = 0; $cursor < count($queue); $cursor++) {
+            $currentId = $queue[$cursor];
 
             foreach ($graph->outgoingEdges($currentId) as $edge) {
                 if (! in_array($edge->type, $followed, true)) {
@@ -300,7 +300,7 @@ final class BuildDependencyGraph
     {
         $negated = str_starts_with($filter, '!');
         $name = ltrim($filter, '!');
-        $middleware = $route->metadata['middleware'] ?? [];
+        $middleware = $route->metadata['resolved_middleware'] ?? $route->metadata['middleware'] ?? [];
         $found = false;
 
         foreach (is_array($middleware) ? $middleware : [] as $entry) {

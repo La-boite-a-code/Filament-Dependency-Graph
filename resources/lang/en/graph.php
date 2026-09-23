@@ -119,7 +119,7 @@ return [
 
     'tree' => [
         'already_shown' => 'already shown',
-        'undispatched_events' => 'Events not dispatched by the application',
+        'undispatched_events' => 'Events without a detected dispatcher',
         'empty' => 'Nothing to display with the current filters.',
     ],
 
@@ -172,7 +172,7 @@ return [
         'listeners' => 'Listeners',
         'queued_listeners' => 'Queued listeners',
         'dispatched_by' => 'Dispatched by',
-        'not_dispatched' => 'Not dispatched',
+        'not_dispatched' => 'No dispatcher found',
         'dispatches' => 'Dispatches',
         'class' => 'Class',
         'kind' => 'Kind',

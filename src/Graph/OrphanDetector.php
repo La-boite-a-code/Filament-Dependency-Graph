@@ -10,7 +10,7 @@ use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 
 /**
  * An orphan model has no incoming relation, no outgoing relation and no
- * linked Filament resource, Livewire component or controller.
+ * linked Filament resource or Livewire component.
  */
 final class OrphanDetector
 {
@@ -27,7 +27,7 @@ final class OrphanDetector
                 $connected[$edge->target->value] = true;
             }
 
-            if (in_array($edge->type, [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel, EdgeType::ControllerUsesModel], true)) {
+            if (in_array($edge->type, [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel], true)) {
                 $connected[$edge->target->value] = true;
             }
         }

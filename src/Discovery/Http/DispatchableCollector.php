@@ -36,8 +36,8 @@ final class DispatchableCollector
         $collected = [];
         $queue = $seeds;
 
-        while ($queue !== []) {
-            $reference = array_shift($queue);
+        for ($cursor = 0; $cursor < count($queue); $cursor++) {
+            $reference = $queue[$cursor];
 
             if ($reference->kind === DispatchKind::Event || isset($collected[$reference->targetId()])) {
                 continue;
@@ -45,7 +45,7 @@ final class DispatchableCollector
 
             $dispatchable = $this->dispatchable($reference, $context, $eventClasses);
             $collected[$dispatchable->id] = $dispatchable;
-            $queue = [...$queue, ...$dispatchable->dispatches];
+            array_push($queue, ...$dispatchable->dispatches);
         }
 
         ksort($collected, SORT_STRING);

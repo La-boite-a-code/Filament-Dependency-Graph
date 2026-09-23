@@ -183,6 +183,7 @@ final class NodeFactory
                 'livewire_class' => $route->livewireClass,
                 'view' => $route->view,
                 'middleware' => $route->middleware,
+                'resolved_middleware' => $route->resolvedMiddleware,
                 'bound_parameters' => $route->boundParameters,
                 'file' => $route->file,
                 'warnings' => $route->warnings,
@@ -248,18 +249,23 @@ final class NodeFactory
         );
     }
 
-    public function forPolicy(PolicyData $policy): Node
+    /**
+     * @param  list<string>  $modelClasses  Every model the policy guards; defaults to the policy's own model.
+     */
+    public function forPolicy(PolicyData $policy, array $modelClasses = []): Node
     {
+        $modelClasses = $modelClasses === [] ? [$policy->modelClass] : $modelClasses;
+
         return new Node(
             id: NodeId::fromString($policy->id),
             type: NodeType::Policy,
             label: ClassName::shortName($policy->class),
-            subtitle: ClassName::shortName($policy->modelClass),
+            subtitle: implode(', ', array_map(static fn (string $class): string => ClassName::shortName($class), $modelClasses)),
             metadata: [
                 'class' => $policy->class,
                 'namespace' => ClassName::namespace($policy->class),
                 'file' => $policy->file,
-                'model_class' => $policy->modelClass,
+                'model_classes' => $modelClasses,
                 'abilities' => $policy->abilities,
                 'source' => $policy->source,
                 'warnings' => $policy->warnings,

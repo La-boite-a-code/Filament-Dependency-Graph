@@ -12,6 +12,14 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\User;
  */
 final class OrderPolicy
 {
+    /** Counts instantiations: discovery must never create a policy. */
+    public static int $instances = 0;
+
+    public function __construct()
+    {
+        self::$instances++;
+    }
+
     public function before(User $user): ?bool
     {
         return null;

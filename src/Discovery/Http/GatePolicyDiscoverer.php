@@ -6,9 +6,11 @@ namespace LaBoiteACode\DependencyGraph\Discovery\Http;
 
 use Illuminate\Contracts\Auth\Access\Gate;
 use LaBoiteACode\DependencyGraph\Contracts\PolicyDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\PolicyData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
+use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
 use LaBoiteACode\DependencyGraph\Support\PackagePath;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use ReflectionClass;
@@ -21,9 +23,12 @@ use Throwable;
  * policies, the UsePolicy attribute, then the gate's own name guessing,
  * which honours a custom guessPolicyNamesUsing() callback.
  */
-final class GatePolicyDiscoverer implements PolicyDiscoverer
+final class GatePolicyDiscoverer implements CollectsDiscoveryWarnings, PolicyDiscoverer
 {
     private const USE_POLICY_ATTRIBUTE = 'Illuminate\\Database\\Eloquent\\Attributes\\UsePolicy';
+
+    /** @var list<DiscoveryWarning> */
+    private array $warnings = [];
 
     public function __construct(
         private readonly Gate $gate,
@@ -35,7 +40,18 @@ final class GatePolicyDiscoverer implements PolicyDiscoverer
         $policies = [];
 
         foreach ($modelClasses as $modelClass) {
-            $resolved = $this->resolve($modelClass, $registered);
+            try {
+                $resolved = $this->resolve($modelClass, $registered);
+            } catch (Throwable $exception) {
+                $this->warnings[] = new DiscoveryWarning(
+                    type: 'policy_not_resolvable',
+                    message: sprintf('The policy of [%s] could not be resolved: %s', $modelClass, $exception->getMessage()),
+                    class: $modelClass,
+                    exceptionClass: $exception::class,
+                );
+
+                continue;
+            }
 
             if ($resolved === null) {
                 continue;
@@ -79,25 +95,39 @@ final class GatePolicyDiscoverer implements PolicyDiscoverer
             }
         }
 
-        return null;
+        $inherited = $this->attributePolicy($modelClass, includeParents: true);
+
+        return $inherited === null ? null : [$inherited, PolicyData::SOURCE_ATTRIBUTE];
     }
 
-    private function attributePolicy(string $modelClass): ?string
+    private function attributePolicy(string $modelClass, bool $includeParents = false): ?string
     {
         if (! class_exists(self::USE_POLICY_ATTRIBUTE) || ! class_exists($modelClass)) {
             return null;
         }
 
-        $attributes = (new ReflectionClass($modelClass))->getAttributes(self::USE_POLICY_ATTRIBUTE);
+        for ($class = new ReflectionClass($modelClass); $class !== false; $class = $includeParents ? $class->getParentClass() : false) {
+            $attributes = $class->getAttributes(self::USE_POLICY_ATTRIBUTE);
 
-        if ($attributes === []) {
-            return null;
+            if ($attributes === []) {
+                continue;
+            }
+
+            $arguments = $attributes[0]->getArguments();
+            $policy = $arguments['class'] ?? $arguments[0] ?? null;
+
+            return is_string($policy) ? ltrim($policy, '\\') : null;
         }
 
-        $arguments = $attributes[0]->getArguments();
-        $policy = $arguments['class'] ?? $arguments[0] ?? null;
+        return null;
+    }
 
-        return is_string($policy) ? ltrim($policy, '\\') : null;
+    public function pullWarnings(): array
+    {
+        $warnings = $this->warnings;
+        $this->warnings = [];
+
+        return $warnings;
     }
 
     /**

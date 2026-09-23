@@ -74,6 +74,7 @@ final class HttpNodeInspector implements NodeInspector
             ]),
             new InspectionSection('middleware', 'Middleware', [
                 'Middleware' => $this->stringList($node, 'middleware'),
+                'Resolved' => $this->stringList($node, 'resolved_middleware'),
             ]),
             new InspectionSection('models', 'Route model binding', [
                 'Bound parameters' => $bindings,
@@ -185,7 +186,7 @@ final class HttpNodeInspector implements NodeInspector
             new InspectionSection('identity', 'Identity', [
                 'Class' => $this->string($node, 'class'),
                 'File' => $this->string($node, 'file'),
-                'Model' => $this->string($node, 'model_class'),
+                'Models' => $this->stringList($node, 'model_classes'),
                 'Resolved by' => $this->string($node, 'source'),
             ]),
             new InspectionSection('abilities', 'Abilities', [

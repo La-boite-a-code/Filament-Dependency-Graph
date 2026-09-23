@@ -10,7 +10,7 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\User as Account;
 
 final class ScannedSubject
 {
-    use ScannedTrait;
+    use ScannedTrait { fromTrait as aliasedFromTrait; }
 
     public function __construct(
         private readonly object $orders,

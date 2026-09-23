@@ -15,15 +15,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Detect dispatches and model references statically in controller actions, listeners and job `handle()` methods, following injected application classes one level deep, with `file:line` locations and the traversed classes on every edge.
 - Read form request rules on demand with the opt-in `http.form_request_rules` option.
 - Add HTTP inspectors for routes, controllers (action by action), form requests, policies, events, listeners and dispatched classes, plus an HTTP usage section on models and details on HTTP edges.
-- Add routes, events and dispatches table datasets, a route tree grouped by URI segment with a group for events nothing dispatches, and a `Not dispatched` badge on those events.
-- Add a middleware filter to the HTTP scope, available in the explorer, in `GraphQuery::$middleware` and as `--middleware` on `filament-dependency-graph:export`.
+- Add routes, events and dispatches table datasets, an action-aware route tree grouped by URI segment with a group for events without a detected dispatcher, and a `No dispatcher found` badge on those events.
+- Resolve route middleware from the route definition and the framework controller attributes, with groups expanded and aliases paired with their classes, and filter the HTTP scope by middleware from the explorer, `GraphQuery::$middleware` or `--middleware` on `filament-dependency-graph:export`.
 - Add the `http` configuration block and the `allowHttpScope()` plugin method.
 - Style the new node types in the graph from the Filament palette and label controller methods and dispatch kinds in the graph and in Mermaid exports.
 
 ### Changed
 
 - Extract the token based source scanner shared by Livewire and HTTP discovery; Livewire discovery output is unchanged.
-- Count controller usage as a connection when detecting orphan models.
 - Bump the snapshot schema to `1.3` for the HTTP map section; cached snapshots are rebuilt automatically.
 
 ## [1.1.2] - 2026-09-22

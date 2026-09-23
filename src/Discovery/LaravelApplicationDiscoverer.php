@@ -160,8 +160,10 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
     }
 
     /**
-     * Models referenced by routes and controllers take part in the graph
-     * even when they live outside the configured model paths.
+     * Application models referenced by routes and controllers take part in
+     * the graph even when they live outside the configured model paths.
+     * Vendor models (DatabaseNotification, ...) follow the vendor_models
+     * option, like every other model.
      *
      * @param  array<string, ModelData>  $models
      * @param  list<string>  $classes
@@ -176,7 +178,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
 
             $model = $this->discoverSingleClass($class, $context);
 
-            if ($model !== null) {
+            if ($model !== null && ($model->applicationOwned || $context->vendorModelsEnabled)) {
                 $models[$model->id] = $model;
             }
         }

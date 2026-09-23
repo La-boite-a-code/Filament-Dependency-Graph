@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LaBoiteACode\DependencyGraph\Filament\Pages;
 
 use BackedEnum;
+use Closure;
 use Filament\Clusters\Cluster;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -29,6 +30,7 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Enums\RelationType;
 use LaBoiteACode\DependencyGraph\Domain\Enums\TraversalDirection;
+use LaBoiteACode\DependencyGraph\Domain\Graph\Edge;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
@@ -1292,10 +1294,12 @@ class DependencyGraphPage extends Page implements HasTable
         $names = [];
 
         foreach ($graph->nodesOfType(NodeType::Route) as $route) {
-            $middleware = $route->metadata['middleware'] ?? [];
+            $middleware = $route->metadata['resolved_middleware'] ?? $route->metadata['middleware'] ?? [];
 
             foreach (is_array($middleware) ? $middleware : [] as $name) {
-                if (is_string($name)) {
+                // Aliases and group names only: class names are too long to
+                // read in a select, and every class has its alias listed too.
+                if (is_string($name) && $name !== 'Closure' && ! str_contains($name, '\\')) {
                     $names[explode(':', $name, 2)[0]] = true;
                 }
             }
@@ -1508,7 +1512,7 @@ class DependencyGraphPage extends Page implements HasTable
 
         $undispatched = array_values(array_filter(
             $graph->nodesOfType(NodeType::Event),
-            static fn (Node $event): bool => in_array('Not dispatched', $event->badges, true),
+            static fn (Node $event): bool => in_array('No dispatcher found', $event->badges, true),
         ));
 
         if ($undispatched !== []) {
@@ -1525,6 +1529,36 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
+     * The HTTP tree reads like one request: model relations are left to the
+     * other scopes, and below a controller only the edges of the action the
+     * route calls are followed.
+     */
+    protected function httpTreeFilter(Graph $graph, Node $root): Closure
+    {
+        $action = null;
+
+        foreach ($graph->outgoingEdges($root->id) as $edge) {
+            if ($edge->type === EdgeType::RouteHandledByController) {
+                $action = $edge->label;
+            }
+        }
+
+        return static function (Edge $edge) use ($graph, $action): bool {
+            if ($edge->type === EdgeType::ModelRelation) {
+                return false;
+            }
+
+            if ($action === null || $graph->node($edge->source)?->type !== NodeType::Controller) {
+                return true;
+            }
+
+            $methods = $edge->metadata['methods'] ?? null;
+
+            return ! is_array($methods) || in_array($action, $methods, true);
+        };
+    }
+
+    /**
      * @param  list<Node>  $nodes
      * @return array<string, mixed>
      */
@@ -1534,7 +1568,7 @@ class DependencyGraphPage extends Page implements HasTable
 
         foreach ($nodes as $node) {
             $visited = [];
-            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited);
+            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited, $this->httpTreeFilter($graph, $node));
         }
 
         return [
@@ -1549,10 +1583,17 @@ class DependencyGraphPage extends Page implements HasTable
 
     /**
      * @param  array<string, true>  $visited
+     * @param  (Closure(Edge): bool)|null  $follow  Decides which outgoing edges become branches.
      * @return array<string, mixed>|null
      */
-    protected function treeNode(Graph $graph, string $nodeId, ?string $viaRelation, int $remainingDepth, array &$visited): ?array
-    {
+    protected function treeNode(
+        Graph $graph,
+        string $nodeId,
+        ?string $viaRelation,
+        int $remainingDepth,
+        array &$visited,
+        ?Closure $follow = null,
+    ): ?array {
         $node = $graph->node($nodeId);
 
         if ($node === null) {
@@ -1579,6 +1620,10 @@ class DependencyGraphPage extends Page implements HasTable
         $children = [];
 
         foreach ($graph->outgoingEdges($nodeId) as $edge) {
+            if ($follow !== null && ! $follow($edge)) {
+                continue;
+            }
+
             $childLabel = $graph->node($edge->target)->label ?? '';
 
             $children[] = [
@@ -1591,7 +1636,7 @@ class DependencyGraphPage extends Page implements HasTable
         usort($children, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         foreach ($children as $child) {
-            $childNode = $this->treeNode($graph, $child['target'], $child['relation'], $remainingDepth - 1, $visited);
+            $childNode = $this->treeNode($graph, $child['target'], $child['relation'], $remainingDepth - 1, $visited, $follow);
 
             if ($childNode !== null) {
                 $item['children'][] = $childNode;

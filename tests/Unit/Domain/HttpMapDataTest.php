@@ -40,6 +40,7 @@ function sampleHttpMap(): HttpMapData
             livewireClass: null,
             view: null,
             middleware: ['web', 'auth'],
+            resolvedMiddleware: ['web', 'auth', 'Illuminate\Auth\Middleware\Authenticate'],
             boundParameters: ['order' => 'App\Models\Order'],
             file: null,
             status: DiscoveryStatus::Complete,

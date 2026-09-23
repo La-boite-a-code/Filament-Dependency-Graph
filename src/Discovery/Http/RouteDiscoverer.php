@@ -39,6 +39,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
 
     public function __construct(
         private readonly Router $router,
+        private readonly MiddlewareResolver $middleware,
     ) {}
 
     /**
@@ -47,8 +48,15 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
     public function discover(DiscoveryContext $context): array
     {
         $routes = [];
+        $cachedClosures = 0;
 
         foreach ($this->router->getRoutes()->getRoutes() as $route) {
+            if (! $context->includeVendorRoutes && $this->isCachedClosure($route)) {
+                $cachedClosures++;
+
+                continue;
+            }
+
             try {
                 $data = $this->discoverRoute($route, $context);
             } catch (Throwable $exception) {
@@ -64,6 +72,16 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
             if ($data !== null) {
                 $routes[$data->id] = $data;
             }
+        }
+
+        if ($cachedClosures > 0) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'route_cache_closures_skipped',
+                message: sprintf(
+                    '%d closure route(s) restored from the route cache were skipped: their file, hence their origin, is unknown. Clear the route cache or enable http.include_vendor_routes to map them.',
+                    $cachedClosures,
+                ),
+            );
         }
 
         $routes = array_values($routes);
@@ -120,7 +138,8 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
                 return null;
             }
         } else {
-            // Closures restored from the route cache are serialized strings.
+            // Closures restored from the route cache are serialized strings;
+            // they only get here when vendor routes are included.
             $actionType = RouteData::ACTION_CLOSURE;
         }
 
@@ -128,6 +147,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
         $methods = $methods === [] ? ['HEAD'] : $methods;
 
         $view = $route->defaults['view'] ?? null;
+        $middleware = $this->middleware->resolve($route, $controllerClass, $controllerMethod);
 
         return new RouteData(
             id: StableIdentifier::route($methods, $route->getDomain(), $route->uri()),
@@ -140,7 +160,8 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
             controllerMethod: $controllerMethod,
             livewireClass: $livewireClass,
             view: is_string($view) ? $view : null,
-            middleware: $this->middleware($route),
+            middleware: $middleware['declared'],
+            resolvedMiddleware: $middleware['resolved'],
             boundParameters: $this->boundParameters($route, $warnings),
             file: $file,
             status: $warnings === [] ? DiscoveryStatus::Complete : DiscoveryStatus::Partial,
@@ -157,6 +178,13 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
         }
 
         return $context->excludedRouteUris !== [] && Str::is($context->excludedRouteUris, $route->uri());
+    }
+
+    private function isCachedClosure(Route $route): bool
+    {
+        $uses = $route->getAction('uses');
+
+        return is_string($uses) && str_starts_with($uses, 'O:') && str_contains($uses, 'SerializableClosure');
     }
 
     private function isApplicationAction(string $actionType, string $class, DiscoveryContext $context): bool
@@ -187,31 +215,6 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
     }
 
     /**
-     * Declared middleware, excluded middleware removed. Middleware that a
-     * controller declares itself is not read, because reading it may
-     * require instantiating the controller.
-     *
-     * @return list<string>
-     */
-    private function middleware(Route $route): array
-    {
-        $excluded = array_map(
-            static fn (mixed $middleware): string => is_string($middleware) ? $middleware : 'Closure',
-            $route->excludedMiddleware(),
-        );
-
-        $middleware = [];
-
-        foreach ($route->middleware() as $name) {
-            if (! in_array($name, $excluded, true) && ! in_array($name, $middleware, true)) {
-                $middleware[] = $name;
-            }
-        }
-
-        return $middleware;
-    }
-
-    /**
      * Route parameters bound to an Eloquent model through the action
      * signature (implicit route model binding).
      *
@@ -232,7 +235,18 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
         $bound = [];
 
         foreach ($parameters as $parameter) {
-            if (! $parameter instanceof ReflectionParameter || ! in_array($parameter->getName(), $names, true)) {
+            if (! $parameter instanceof ReflectionParameter) {
+                continue;
+            }
+
+            // Implicit binding also matches $orderItem to {order_item}.
+            $name = match (true) {
+                in_array($parameter->getName(), $names, true) => $parameter->getName(),
+                in_array(Str::snake($parameter->getName()), $names, true) => Str::snake($parameter->getName()),
+                default => null,
+            };
+
+            if ($name === null) {
                 continue;
             }
 
@@ -246,7 +260,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
 
             try {
                 if (is_subclass_of($class, Model::class)) {
-                    $bound[$parameter->getName()] = $class;
+                    $bound[$name] = $class;
                 }
             } catch (Throwable) {
                 continue;

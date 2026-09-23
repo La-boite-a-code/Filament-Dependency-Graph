@@ -83,9 +83,13 @@ final class EventDiscoverer implements CollectsDiscoveryWarnings
 
                 [$class, $method] = $callable;
 
+                // Checked before anything autoloads the listener: a broken
+                // vendor class must not take the whole map down.
                 if (! NamespaceMatcher::matchesNamespace($class, $context->httpApplicationNamespaces)) {
                     continue;
                 }
+
+                $method ??= $this->defaultMethod($class);
 
                 $keptListeners[] = $class;
                 $listeners[$class][$event] = $method;
@@ -184,7 +188,7 @@ final class EventDiscoverer implements CollectsDiscoveryWarnings
     }
 
     /**
-     * @return array{0: string, 1: string}|null Null for closures and objects.
+     * @return array{0: string, 1: string|null}|null Null for closures and objects; a null method means the default one.
      */
     private function callable(mixed $listener): ?array
     {
@@ -203,14 +207,17 @@ final class EventDiscoverer implements CollectsDiscoveryWarnings
         }
 
         $parts = explode('@', $listener, 2);
-        $class = ltrim($parts[0], '\\');
-        $method = $parts[1] ?? null;
 
-        if ($method === null) {
-            $method = method_exists($class, 'handle') ? 'handle' : '__invoke';
+        return [ltrim($parts[0], '\\'), $parts[1] ?? null];
+    }
+
+    private function defaultMethod(string $class): string
+    {
+        try {
+            return method_exists($class, 'handle') ? 'handle' : '__invoke';
+        } catch (Throwable) {
+            return 'handle';
         }
-
-        return [$class, $method];
     }
 
     private function isClassEvent(string $event): bool

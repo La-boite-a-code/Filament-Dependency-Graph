@@ -6,6 +6,7 @@ namespace LaBoiteACode\DependencyGraph\Discovery\Http;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\ControllerActionData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\ControllerData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
@@ -138,7 +139,8 @@ final class ControllerDiscoverer
             if ($this->isSubclassOf($class, FormRequest::class)) {
                 $formRequests[] = $class;
             } elseif ($this->isSubclassOf($class, Model::class)) {
-                $models[$class][] = ($bound[$parameter->getName()] ?? null) === $class
+                $boundClass = $bound[$parameter->getName()] ?? $bound[Str::snake($parameter->getName())] ?? null;
+                $models[$class][] = $boundClass === $class
                     ? ControllerActionData::SOURCE_BINDING
                     : ControllerActionData::SOURCE_TYPE;
             }

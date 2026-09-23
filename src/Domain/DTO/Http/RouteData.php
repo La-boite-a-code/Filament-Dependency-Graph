@@ -20,7 +20,8 @@ final readonly class RouteData
 
     /**
      * @param  list<string>  $methods  HTTP methods, HEAD excluded.
-     * @param  list<string>  $middleware  Middleware names in execution order, groups expanded.
+     * @param  list<string>  $middleware  Middleware as declared on the route and the controller attributes.
+     * @param  list<string>  $resolvedMiddleware  Declared middleware plus group members, aliases and their classes.
      * @param  array<string, string>  $boundParameters  Route parameter to bound model class.
      * @param  list<string>  $warnings
      */
@@ -36,6 +37,7 @@ final readonly class RouteData
         public ?string $livewireClass,
         public ?string $view,
         public array $middleware,
+        public array $resolvedMiddleware,
         public array $boundParameters,
         public ?string $file,
         public DiscoveryStatus $status,
@@ -56,7 +58,7 @@ final readonly class RouteData
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{id: string, methods: list<string>, uri: string, name: string|null, domain: string|null, action_type: string, controller_class: string|null, controller_method: string|null, livewire_class: string|null, view: string|null, middleware: list<string>, bound_parameters: array<string, string>, file: string|null, status: string, warnings: list<string>} $data */
+        /** @var array{id: string, methods: list<string>, uri: string, name: string|null, domain: string|null, action_type: string, controller_class: string|null, controller_method: string|null, livewire_class: string|null, view: string|null, middleware: list<string>, resolved_middleware: list<string>, bound_parameters: array<string, string>, file: string|null, status: string, warnings: list<string>} $data */
         return new self(
             id: $data['id'],
             methods: $data['methods'],
@@ -69,6 +71,7 @@ final readonly class RouteData
             livewireClass: $data['livewire_class'],
             view: $data['view'],
             middleware: $data['middleware'],
+            resolvedMiddleware: $data['resolved_middleware'],
             boundParameters: $data['bound_parameters'],
             file: $data['file'],
             status: DiscoveryStatus::from($data['status']),
@@ -93,6 +96,7 @@ final readonly class RouteData
             'livewire_class' => $this->livewireClass,
             'view' => $this->view,
             'middleware' => $this->middleware,
+            'resolved_middleware' => $this->resolvedMiddleware,
             'bound_parameters' => $this->boundParameters,
             'file' => $this->file,
             'status' => $this->status->value,

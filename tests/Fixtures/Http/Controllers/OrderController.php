@@ -17,9 +17,14 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Order;
 
 final class OrderController
 {
+    /** Counts instantiations: discovery must never create a controller. */
+    public static int $instances = 0;
+
     public function __construct(
         private readonly OrderRepository $orders,
-    ) {}
+    ) {
+        self::$instances++;
+    }
 
     public function index(): string
     {

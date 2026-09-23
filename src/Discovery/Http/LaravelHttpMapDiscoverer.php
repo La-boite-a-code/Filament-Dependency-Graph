@@ -41,6 +41,18 @@ final class LaravelHttpMapDiscoverer implements CollectsDiscoveryWarnings, HttpM
             return new HttpMapData;
         }
 
+        try {
+            return $this->map($context);
+        } finally {
+            // Drained even when a step throws, so no warning leaks into the
+            // next discovery run of these long-lived services.
+            $this->drain($this->routes);
+            $this->drain($this->events);
+        }
+    }
+
+    private function map(DiscoveryContext $context): HttpMapData
+    {
         $eventClasses = $this->events->eventClasses();
         $routes = $this->routes->discover($context);
         $controllers = $this->controllers->discover($routes, $context, $eventClasses);
@@ -50,25 +62,22 @@ final class LaravelHttpMapDiscoverer implements CollectsDiscoveryWarnings, HttpM
 
         foreach ($controllers as $controller) {
             foreach ($controller->actions as $action) {
-                $formRequestClasses = [...$formRequestClasses, ...$action->formRequests];
-                $seeds = [...$seeds, ...$action->dispatches];
+                array_push($formRequestClasses, ...$action->formRequests);
+                array_push($seeds, ...$action->dispatches);
             }
         }
 
         [$events, $listeners] = $this->events->discover($context, $eventClasses);
 
         foreach ($listeners as $listener) {
-            $seeds = [...$seeds, ...$listener->dispatches];
+            array_push($seeds, ...$listener->dispatches);
         }
 
         $dispatchables = $this->dispatchables->collect($seeds, $context, $eventClasses);
 
         foreach ($dispatchables as $dispatchable) {
-            $seeds = [...$seeds, ...$dispatchable->dispatches];
+            array_push($seeds, ...$dispatchable->dispatches);
         }
-
-        $this->drain($this->routes);
-        $this->drain($this->events);
 
         return new HttpMapData(
             routes: $routes,

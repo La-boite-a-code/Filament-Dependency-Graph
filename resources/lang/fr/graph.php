@@ -119,7 +119,7 @@ return [
 
     'tree' => [
         'already_shown' => 'deja affiche',
-        'undispatched_events' => 'Evenements jamais declenches par l\'application',
+        'undispatched_events' => 'Evenements sans declencheur detecte',
         'empty' => 'Rien a afficher avec les filtres actuels.',
     ],
 
@@ -172,7 +172,7 @@ return [
         'listeners' => 'Listeners',
         'queued_listeners' => 'Listeners en file',
         'dispatched_by' => 'Declenche par',
-        'not_dispatched' => 'Jamais declenche',
+        'not_dispatched' => 'Aucun declencheur detecte',
         'dispatches' => 'Declenchements',
         'class' => 'Classe',
         'kind' => 'Nature',

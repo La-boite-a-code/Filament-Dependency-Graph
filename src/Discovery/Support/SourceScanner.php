@@ -20,21 +20,48 @@ final class SourceScanner
 
     private const IGNORED_TOKENS = [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT, T_OPEN_TAG, T_CLOSE_TAG, T_INLINE_HTML];
 
+    /**
+     * Tokens take roughly twenty times the memory of the source, so only
+     * the most recently read files are kept: enough for the actions of one
+     * controller and the classes they call.
+     */
+    private const CACHED_FILES = 16;
+
     /** @var array<string, SourceFile|null> */
     private array $files = [];
 
     /**
-     * Reads and tokenizes a file once per scanner lifetime.
+     * Reads and tokenizes a file, keeping the most recent ones in memory.
      */
     public function file(string $path): ?SourceFile
     {
         if (array_key_exists($path, $this->files)) {
-            return $this->files[$path];
+            $file = $this->files[$path];
+
+            // Move the entry to the end: the cache evicts the oldest reads.
+            unset($this->files[$path]);
+
+            return $this->files[$path] = $file;
         }
 
+        $file = $this->read($path);
+        $this->files[$path] = $file;
+
+        if (count($this->files) > self::CACHED_FILES) {
+            unset($this->files[array_key_first($this->files)]);
+        }
+
+        return $file;
+    }
+
+    /**
+     * Reads and tokenizes a file without caching it.
+     */
+    public function read(string $path): ?SourceFile
+    {
         $source = is_file($path) ? @file_get_contents($path) : false;
 
-        return $this->files[$path] = $source === false ? null : $this->parse($source);
+        return $source === false ? null : $this->parse($source);
     }
 
     /**
@@ -75,7 +102,12 @@ final class SourceScanner
             return null;
         }
 
-        $body = $this->methodBody($file->tokens, $method->getName(), (int) $method->getStartLine());
+        $body = $this->methodBody(
+            $file->tokens,
+            $method->getName(),
+            (int) $method->getStartLine(),
+            (int) $method->getEndLine(),
+        );
 
         return $body === null ? null : new MethodSource($this, $file, $body);
     }
@@ -176,6 +208,8 @@ final class SourceScanner
         $namespace = '';
         $imports = [];
         $depth = 0;
+        // Imports live at depth 0, or at depth 1 inside a braced namespace.
+        $importDepth = 0;
         $count = count($tokens);
 
         for ($index = 0; $index < $count; $index++) {
@@ -193,15 +227,20 @@ final class SourceScanner
                 continue;
             }
 
-            if ($depth !== 0) {
+            if ($depth !== $importDepth) {
                 continue;
             }
 
-            if ($token->is(T_NAMESPACE) && $namespace === '') {
+            if ($token->is(T_NAMESPACE) && $depth === 0) {
                 $next = $tokens[$index + 1] ?? null;
+                $hasName = $next !== null && $next->is([T_STRING, T_NAME_QUALIFIED]);
 
-                if ($next !== null && $next->is([T_STRING, T_NAME_QUALIFIED])) {
+                if ($hasName && $namespace === '') {
                     $namespace = $next->text;
+                }
+
+                if (($tokens[$index + ($hasName ? 2 : 1)] ?? null)?->is('{')) {
+                    $importDepth = 1;
                 }
 
                 continue;
@@ -240,9 +279,9 @@ final class SourceScanner
         $members = preg_match('/^(.+?)\\\\\{(.+)}$/', $statement, $matches) === 1
             ? array_map(
                 static fn (string $member): string => rtrim($matches[1], '\\') . '\\' . trim($member),
-                explode(',', $matches[2]),
+                array_filter(explode(',', $matches[2]), static fn (string $member): bool => trim($member) !== ''),
             )
-            : array_map('trim', explode(',', $statement));
+            : array_filter(array_map('trim', explode(',', $statement)), static fn (string $member): bool => $member !== '');
 
         $imports = [];
 
@@ -261,20 +300,24 @@ final class SourceScanner
     }
 
     /**
-     * Tokens between the braces of the named method declared at or after the
-     * given line.
+     * Tokens between the braces of the method declared between the given
+     * lines. The name is matched first; a method imported from a trait
+     * under an alias is declared under its original name, so the first
+     * function of the line range is used as a fallback.
      *
      * @param  list<PhpToken>  $tokens
      * @return list<PhpToken>|null
      */
-    private function methodBody(array $tokens, string $method, int $startLine): ?array
+    private function methodBody(array $tokens, string $method, int $startLine, int $endLine): ?array
     {
         $count = count($tokens);
+        $fallback = null;
+        $start = null;
 
         for ($index = 0; $index < $count; $index++) {
             $token = $tokens[$index];
 
-            if (! $token->is(T_FUNCTION) || $token->line < $startLine) {
+            if (! $token->is(T_FUNCTION) || $token->line < $startLine || $token->line > $endLine) {
                 continue;
             }
 
@@ -284,44 +327,61 @@ final class SourceScanner
                 $name = $tokens[$index + 2] ?? null;
             }
 
-            if ($name === null || strcasecmp($name->text, $method) !== 0) {
+            // Method names may be keywords (empty, list...): any identifier counts,
+            // an opening parenthesis means a closure.
+            if ($name === null || preg_match('/^[A-Za-z_\x80-\xff][A-Za-z0-9_\x80-\xff]*$/', $name->text) !== 1) {
                 continue;
             }
 
-            for ($cursor = $index + 1; $cursor < $count; $cursor++) {
-                if ($tokens[$cursor]->is(';')) {
-                    return null;
-                }
+            $fallback ??= $index;
 
-                if ($tokens[$cursor]->is('{')) {
-                    break;
-                }
+            if (strcasecmp($name->text, $method) === 0) {
+                $start = $index;
+
+                break;
             }
-
-            $body = [];
-            $depth = 0;
-
-            for (; $cursor < $count; $cursor++) {
-                $current = $tokens[$cursor];
-
-                if ($current->is(['{', T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES])) {
-                    $depth++;
-                } elseif ($current->is('}')) {
-                    $depth--;
-
-                    if ($depth === 0) {
-                        return $body;
-                    }
-                }
-
-                if ($depth > 0 && ! ($depth === 1 && $current->is('{') && $body === [])) {
-                    $body[] = $current;
-                }
-            }
-
-            return $body;
         }
 
-        return null;
+        $index = $start ?? $fallback;
+
+        if ($index === null) {
+            return null;
+        }
+
+        for ($cursor = $index + 1; $cursor < $count; $cursor++) {
+            if ($tokens[$cursor]->is(';')) {
+                return null;
+            }
+
+            if ($tokens[$cursor]->is('{')) {
+                break;
+            }
+        }
+
+        $body = [];
+        $depth = 0;
+
+        for (; $cursor < $count; $cursor++) {
+            $current = $tokens[$cursor];
+
+            if ($current->is(['{', T_CURLY_OPEN, T_DOLLAR_OPEN_CURLY_BRACES])) {
+                $depth++;
+
+                // The opening brace of the method itself is not part of the body.
+                if ($depth === 1) {
+                    continue;
+                }
+            } elseif ($current->is('}')) {
+                $depth--;
+
+                if ($depth === 0) {
+                    return $body;
+                }
+            }
+
+            $body[] = $current;
+        }
+
+        return $body;
     }
 }

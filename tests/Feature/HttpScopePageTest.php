@@ -68,7 +68,7 @@ it('groups the HTTP tree by URI segment and lists undispatched events', function
         ->assertSeeHtml('fdg-tree-group')
         ->assertSee('/orders')
         ->assertSee('/dashboard')
-        ->assertSee('Events not dispatched by the application');
+        ->assertSee('Events without a detected dispatcher');
 });
 
 it('filters routes by middleware', function (): void {
@@ -114,4 +114,23 @@ it('only offers node types that exist in the current scope', function (): void {
     expect($page->instance()->getNodeTypeOptions())->toHaveKey('route')
         ->toHaveKey('model')
         ->not->toHaveKey('panel');
+});
+
+it('expands only the action a route calls in the HTTP tree', function (): void {
+    $tree = Livewire::test(DependencyGraphPage::class)
+        ->set('scope', 'http')
+        ->instance()
+        ->getTree();
+
+    $orders = collect($tree)->firstWhere('label', '/orders');
+    $show = collect($orders['children'])->firstWhere('label', 'GET /orders/{order}');
+    $store = collect($orders['children'])->firstWhere('label', 'POST /orders');
+
+    $labels = static function (array $item) use (&$labels): array {
+        return [$item['label'], ...collect($item['children'])->flatMap($labels)->all()];
+    };
+
+    expect($labels($show))->toBe(['GET /orders/{order}', 'OrderController', 'Order', 'OrderPolicy'])
+        ->and($labels($store))->toContain('StoreOrderRequest', 'OrderPlaced', 'SendOrderConfirmation', 'ShipOrder', 'NotifyWarehouse')
+        ->and($labels($store))->not->toContain('UpdateOrderRequest', 'ArchiveOrder', 'Customer');
 });

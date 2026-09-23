@@ -129,3 +129,26 @@ it('finds the first literal rendered view', function (): void {
     expect($scanner->renderedView($scanner->parse('<?php return view("livewire.orders", []);')))->toBe('livewire.orders')
         ->and($scanner->renderedView($scanner->parse('<?php return view($name);')))->toBeNull();
 });
+
+it('reads trait methods imported under an alias', function (): void {
+    expect(array_column(scannedMethod('aliasedFromTrait')->staticClassReferences(), 'class'))->toBe([Invoice::class]);
+});
+
+it('reads imports declared inside a braced namespace', function (): void {
+    $file = (new SourceScanner)->parse(<<<'PHP'
+        <?php
+        namespace App\Http {
+            use App\Models\Order;
+            class Foo {}
+        }
+        PHP);
+
+    expect($file->namespace)->toBe('App\Http')
+        ->and($file->imports)->toBe(['Order' => 'App\Models\Order']);
+});
+
+it('ignores the trailing comma of a grouped import', function (): void {
+    $file = (new SourceScanner)->parse('<?php namespace App; use App\Models\{Order, Item,};');
+
+    expect($file->imports)->toBe(['Order' => 'App\Models\Order', 'Item' => 'App\Models\Item']);
+});

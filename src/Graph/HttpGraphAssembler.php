@@ -33,7 +33,7 @@ final class HttpGraphAssembler
 
         foreach ($http->routes as $route) {
             $nodes[] = $this->nodes->forRoute($route);
-            $edges = [...$edges, ...$this->routeEdges($route)];
+            array_push($edges, ...$this->routeEdges($route));
         }
 
         foreach ($http->controllers as $controller) {
@@ -49,8 +49,9 @@ final class HttpGraphAssembler
                 }
 
                 foreach ($action->models as $class => $sources) {
+                    $models[$class] ??= ['methods' => [], 'sources' => []];
                     $models[$class]['methods'][] = $method;
-                    $models[$class]['sources'] = [...($models[$class]['sources'] ?? []), ...$sources];
+                    array_push($models[$class]['sources'], ...$sources);
                 }
 
                 foreach ($action->dispatches as $dispatch) {
@@ -81,15 +82,25 @@ final class HttpGraphAssembler
                 );
             }
 
-            $edges = [...$edges, ...$this->dispatchEdges($controller->id, $dispatches)];
+            array_push($edges, ...$this->dispatchEdges($controller->id, $dispatches));
         }
 
         foreach ($http->formRequests as $request) {
             $nodes[] = $this->nodes->forFormRequest($request);
         }
 
+        $policyModels = [];
+
         foreach ($http->policies as $policy) {
-            $nodes[] = $this->nodes->forPolicy($policy);
+            $policyModels[$policy->id][] = $policy->modelClass;
+        }
+
+        foreach ($http->policies as $policy) {
+            if (isset($policyModels[$policy->id])) {
+                $nodes[] = $this->nodes->forPolicy($policy, $policyModels[$policy->id]);
+                unset($policyModels[$policy->id]);
+            }
+
             $edges[] = $this->edges->http(
                 EdgeType::ModelGuardedByPolicy,
                 StableIdentifier::model($policy->modelClass),
@@ -112,18 +123,18 @@ final class HttpGraphAssembler
                 );
             }
 
-            $edges = [...$edges, ...$this->dispatchEdges(
+            array_push($edges, ...$this->dispatchEdges(
                 $listener->id,
                 array_map(static fn (DispatchReference $dispatch): array => [null, $dispatch], $listener->dispatches),
-            )];
+            ));
         }
 
         foreach ($http->dispatchables as $dispatchable) {
             $nodes[] = $this->nodes->forDispatchable($dispatchable);
-            $edges = [...$edges, ...$this->dispatchEdges(
+            array_push($edges, ...$this->dispatchEdges(
                 $dispatchable->id,
                 array_map(static fn (DispatchReference $dispatch): array => [null, $dispatch], $dispatchable->dispatches),
-            )];
+            ));
         }
 
         $dispatchedEventIds = [];
@@ -135,7 +146,7 @@ final class HttpGraphAssembler
         }
 
         foreach ($http->events as $event) {
-            $nodes[] = $this->nodes->forEvent($event, isset($dispatchedEventIds[$event->id]) ? [] : ['Not dispatched']);
+            $nodes[] = $this->nodes->forEvent($event, isset($dispatchedEventIds[$event->id]) ? [] : ['No dispatcher found']);
         }
 
         return [$nodes, $edges];
@@ -184,7 +195,7 @@ final class HttpGraphAssembler
                 $grouped[$targetId]['methods'][] = $method;
             }
 
-            $grouped[$targetId]['via'] = [...$grouped[$targetId]['via'], ...$dispatch->via];
+            array_push($grouped[$targetId]['via'], ...$dispatch->via);
             $grouped[$targetId]['locations'][] = $dispatch->location;
         }
 

@@ -114,7 +114,7 @@ final class LivewireComponentDiscoverer implements CollectsDiscoveryWarnings, Li
         $warnings = [];
 
         $file = $reflection->getFileName();
-        $source = is_string($file) ? $this->scanner->file($file) : null;
+        $source = is_string($file) ? $this->scanner->read($file) : null;
 
         if ($source === null) {
             $warnings[] = 'Source file could not be read; static model references and the rendered view were not inspected.';

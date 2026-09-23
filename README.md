@@ -149,17 +149,17 @@ The HTTP scope answers "what happens when this URL is called?" without running a
 
 | Node | Where it comes from |
 | ---- | ------------------- |
-| Route | The router (`route:cache` included). Application routes only: controllers under `http.controller_namespaces`, closures and view or redirect routes defined outside `vendor/`, and full-page Livewire components. |
+| Route | The router. Application routes only: controllers under `http.controller_namespaces`, closures defined outside `vendor/`, view and redirect routes, and full-page Livewire components. |
 | Controller | The routes pointing to it. One node per class; each routed method appears on the edges and in the inspector. |
 | Form request | Action parameters typed with a `FormRequest`. Rules are read only when `http.form_request_rules` is enabled. |
 | Model | Route model binding, typed action parameters, and static references such as `Order::query()` in the action. |
-| Policy | Registered policies, the `#[UsePolicy]` attribute, then Laravel's naming convention - including a custom `Gate::guessPolicyNamesUsing()` callback. Policies are never instantiated. |
+| Policy | Registered policies, the `#[UsePolicy]` attribute, then Laravel's naming convention - including a custom `Gate::guessPolicyNamesUsing()` callback, which is called to compute the name. Policies are never instantiated. |
 | Event, listener | The event dispatcher's listener map, which includes Laravel's event discovery. Listeners outside `http.application_namespaces` are ignored. |
 | Job, mailable, notification | `X::dispatch()`, `X::broadcast()` and `new X` in controller actions, listeners and job `handle()` methods, classified by their type (`Mailable`, `Notification`, event, `ShouldQueue` or bus `Dispatchable`). |
 
 Calls on injected application classes are followed **one level deep**: when `store()` calls `$placeOrder->execute()` on a typed parameter or `$this->orders->archive()` on a promoted property, the called method is read as well and its dispatches are attributed to the controller with a `via` note. Every dispatch keeps its `file:line` location in the inspector.
 
-The explorer adds a **middleware filter** in this scope: "Routes using auth" keeps the routes whose middleware includes `auth` (with or without parameters) and what they reach, "Routes without auth" the others. The traversal is action-aware: a controller reached from `index` does not drag in what `store` dispatches.
+Route middleware combines the route definition with the framework's controller attributes (`#[Middleware]`, `#[Authorize]`, `#[WithoutMiddleware]` on Laravel 13). Groups are expanded recursively and aliases are paired with their classes, so the explorer's **middleware filter** is reliable: "Routes using auth" keeps the routes whose middleware includes `auth` (directly, with parameters such as `auth:sanctum`, through a group or as its class) and what they reach, "Routes without auth" the others. The traversal is action-aware: a controller reached from `index` does not drag in what `store` dispatches; the tree view follows the same rule.
 
 ### Detection limits
 
@@ -168,10 +168,10 @@ Everything above comes from registries, reflection and a token-level reading of 
 - explicit bindings registered with `Route::bind()` or `Route::model()`;
 - classes built dynamically (`new $class`, `app($name)`, `dispatch($job)` on an untyped variable);
 - dispatches more than one collaborator away from the action, listener or job;
-- middleware declared inside a controller (reading it may require instantiating the controller);
-- the file of closure routes restored from the route cache.
+- middleware returned by a controller's static `middleware()` method (`HasMiddleware`): only the framework attributes are read;
+- closure routes restored from the route cache: their file is unknown, so they are skipped with a warning unless `http.include_vendor_routes` is enabled.
 
-Events that nothing in the application seems to dispatch carry a `Not dispatched` badge: either they are dispatched from a place the scanner cannot see, or they are dead code.
+Events without any dispatch found in controllers, listeners or jobs carry a `No dispatcher found` badge. Livewire components, console commands, observers and Filament actions are not scanned, so the event may be dispatched from there - or be dead code.
 
 ## Configuration
 
