@@ -119,3 +119,7 @@ Every option feeds `DiscoveryContext`, hence the cache fingerprint.
 3. **`getView()`** is read for `view('…')` literals and for plain `return '…';` string literals.
 4. **Mermaid** quotes labels containing characters other than letters, digits, spaces, dots, dashes and underscores (`-->|"@include"|`), with entity codes for quotes and angle brackets.
 5. **HTTP bridge**: the HTTP traversal follows `renders_view` from every kept node (routes, controllers action-aware, Livewire components, mailables, notifications), views remain leaves because view edges are not followed.
+6. **Livewire conventions**: a component without `render()` renders the view named after it under `livewire.view_path`; a routed full-page component without a layout uses `livewire.layout`; `Route::livewire()` routes (Livewire 4) are read from the route action, single and multi-file components included.
+7. **Strict leaves**: the HTTP scope drops the reference edges between two kept views, so views never unfold there.
+8. **Views tree**: a template shared by several owners is unfolded once for the whole tree; each root still unfolds.
+9. **Without the HTTP map**, routes and controllers are still read to classify the views they render.

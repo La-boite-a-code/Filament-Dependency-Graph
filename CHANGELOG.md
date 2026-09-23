@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-09-23
+## [1.2.0] - 2026-09-24
 
 ### Added
 
@@ -20,9 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Add the `http` configuration block and the `allowHttpScope()` plugin method.
 - Style the new node types in the graph from the Filament palette and label controller methods and dispatch kinds in the graph and in Mermaid exports.
 - Add a Views scope mapping the Blade templates of the application: `@extends`, the `@include` family, `@each`, `@component`, `@livewire`, `<x-…>` and `<livewire:…>` references with their line, resolved by the view finder, Blade's component tag compiler and Livewire's registry, without compiling or rendering anything.
-- Map what renders views: Livewire components (`render()`, `->layout()`, `#[Layout]`), Blade class components, Filament pages, widgets and fields with a custom `$view`, mailables and notifications, `Route::view()` routes and controller actions. Livewire 4 single-file and multi-file components are supported.
+- Map what renders views: Livewire components (`render()`, `->layout()`, `#[Layout]`, the conventional view of components without `render()` and the configured layout of full-page components), Blade class components, Filament pages, widgets and fields with a custom `$view`, mailables and notifications, `Route::view()` and `Route::livewire()` routes and controller actions. Livewire 4 single-file and multi-file components are supported.
 - Show package views as leaves, flag missing views and dynamic references, infer each view's kind (layout, page, partial, component, Livewire, mail) and badge templates without a detected reference.
-- Add view inspectors ("Renders" and "Used by"), views, components and package views table datasets, a Views tree grouped by owner, a "Used in views" column for Livewire components, and a one-hop bridge from the HTTP scope to the views routes and actions render.
+- Add view inspectors ("Renders" and "Used by"), views, components and package views table datasets, a Views tree grouped by owner that unfolds shared templates once, a "Used in views" column for Livewire components, and a one-hop bridge from the HTTP scope to the views routes and actions render.
+- Search nodes by file path.
 - Add the `views` configuration block and the `allowViewsScope()` plugin method.
 
 ### Changed
@@ -30,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Extract the token based source scanner shared by Livewire and HTTP discovery; Livewire discovery output is unchanged.
 - Bump the snapshot schema to `1.4` for the HTTP and view map sections; cached snapshots are rebuilt automatically.
 - Quote Mermaid edge labels that contain directives or component tags so they stay readable.
+- Build the Filament and Laravel scopes without the HTTP and view maps, read the cached snapshot once per request (the manager is now bound as a scoped instance) and send the graph renderer only the fields it draws, which keeps the page fast on large applications.
 
 ## [1.1.2] - 2026-09-22
 

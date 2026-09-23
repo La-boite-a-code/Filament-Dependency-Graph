@@ -195,9 +195,11 @@ The Views scope answers "what does this page render?" and "where is this compone
 
 Templates are read as text: `@extends`, `@include`, `@includeIf`, `@includeWhen`, `@includeUnless`, `@includeFirst` (every candidate), `@each` (and its empty view), `@component`, `@livewire`, `<x-…>` and `<livewire:…>` are extracted with their line, comments and `@verbatim` blocks ignored. Names are then resolved by the framework itself: the view finder for view names, Blade's component tag compiler for `<x-…>` (aliases, namespaces, anonymous components), Livewire's registry for `<livewire:…>`.
 
-Each view has a kind, inferred from how it is used: `layout`, `page`, `partial`, `component`, `livewire` or `mail`. Templates that nothing references carry a `No reference found` badge.
+Each view has a kind, inferred from how it is used: `layout`, `page`, `partial`, `component`, `livewire` or `mail`. Templates and Blade class components that nothing references carry a `No reference found` badge.
 
-The owners of views are read, never run: `render()` and `#[Layout]` for Livewire, `render()` for Blade components, `$view` for Filament classes, `content()` / `build()` / `toMail()` for mail, `Route::view()` for routes and `view()` / `View::make()` / `->view()` in controller actions.
+The owners of views are read, never run: `render()`, `->layout()` and `#[Layout]` for Livewire (a component without `render()` gets the view named after it under `livewire.view_path`, a full-page component without a layout gets `livewire.layout`), `render()` for Blade components, `$view` for Filament classes, `content()` / `build()` / `toMail()` for mail, `Route::view()` and `Route::livewire()` for routes and `view()` / `View::make()` / `->view()` in controller actions.
+
+In the HTTP scope, views stay leaves: a route shows the page it renders, not the layout and partials behind it. In the Views tree, a template shared by several pages is unfolded once; its other occurrences are marked as already shown.
 
 ### Detection limits
 
