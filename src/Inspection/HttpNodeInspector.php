@@ -12,6 +12,7 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Edge;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
+use LaBoiteACode\DependencyGraph\Inspection\Concerns\DescribesViewEdges;
 use LaBoiteACode\DependencyGraph\Support\ClassName;
 
 /**
@@ -20,6 +21,8 @@ use LaBoiteACode\DependencyGraph\Support\ClassName;
  */
 final class HttpNodeInspector implements NodeInspector
 {
+    use DescribesViewEdges;
+
     public function supports(Node $node): bool
     {
         return $node->type->isHttp();
@@ -36,6 +39,12 @@ final class HttpNodeInspector implements NodeInspector
             NodeType::Listener => $this->listener($node, $graph),
             default => $this->dispatchable($node, $graph),
         };
+
+        $views = $this->renderedViews($node, $graph);
+
+        if ($views !== []) {
+            $sections[] = new InspectionSection('views', 'Views', ['Renders' => $views]);
+        }
 
         return new InspectionData(
             subjectId: $node->id->value,

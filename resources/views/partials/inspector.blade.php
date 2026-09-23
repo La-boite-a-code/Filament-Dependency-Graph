@@ -55,6 +55,26 @@
             'color' => 'gray',
             'icon' => 'heroicon-m-ear',
         ],
+        'view' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.view'),
+            'color' => 'primary',
+            'icon' => 'heroicon-m-document-text',
+        ],
+        'blade_component', 'filament_component' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.' . $inspection['subject_type']),
+            'color' => 'info',
+            'icon' => 'heroicon-m-puzzle-piece',
+        ],
+        'external_view' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.external_view'),
+            'color' => 'gray',
+            'icon' => 'heroicon-m-archive-box',
+        ],
+        'dynamic_view' => [
+            'label' => __('filament-dependency-graph::graph.inspector.types.dynamic_view'),
+            'color' => 'warning',
+            'icon' => 'heroicon-m-question-mark-circle',
+        ],
         'job', 'mailable', 'notification' => [
             'label' => __('filament-dependency-graph::graph.inspector.types.' . $inspection['subject_type']),
             'color' => 'success',
@@ -104,6 +124,9 @@
         'listeners' => 'heroicon-m-ear',
         'dispatched_by' => 'heroicon-m-arrow-down-left',
         'dispatches' => 'heroicon-m-paper-airplane',
+        'renders' => 'heroicon-m-arrow-down-right',
+        'used_by' => 'heroicon-m-arrow-up-left',
+        'views' => 'heroicon-m-document-text',
     ];
 
     $codeLabels = [

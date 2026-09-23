@@ -10,9 +10,12 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\InspectionSection;
 use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
+use LaBoiteACode\DependencyGraph\Inspection\Concerns\DescribesViewEdges;
 
 final class LivewireComponentInspector implements NodeInspector
 {
+    use DescribesViewEdges;
+
     public function supports(Node $node): bool
     {
         return $node->type === NodeType::LivewireComponent;
@@ -60,6 +63,10 @@ final class LivewireComponentInspector implements NodeInspector
                 ]),
                 new InspectionSection('models', 'Model dependencies', [
                     'Models' => $models,
+                ]),
+                new InspectionSection('views', 'Views', [
+                    'Renders' => $this->renderedViews($node, $graph),
+                    'Used in' => $this->viewUsages($node, $graph),
                 ]),
                 new InspectionSection('diagnostics', 'Diagnostics', [
                     'Status' => $node->status->value,

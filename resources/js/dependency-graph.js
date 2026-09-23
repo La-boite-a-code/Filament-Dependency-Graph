@@ -164,6 +164,12 @@ export default function dependencyGraph({ graph, selected, layout }) {
                       listenerBorder: themeColor('--gray-400', '#9ca3af'),
                       dispatchable: themeColor('--success-950', '#052e16'),
                       dispatchableBorder: themeColor('--success-500', '#22c55e'),
+                      view: themeColor('--gray-900', '#111827'),
+                      viewBorder: themeColor('--primary-400', '#818cf8'),
+                      component: themeColor('--info-950', '#172554'),
+                      componentBorder: themeColor('--info-400', '#60a5fa'),
+                      external: themeColor('--gray-800', '#1f2937'),
+                      externalBorder: themeColor('--gray-500', '#6b7280'),
                       selection: themeColor('--warning-500', '#f59e0b'),
                   }
                 : {
@@ -197,6 +203,12 @@ export default function dependencyGraph({ graph, selected, layout }) {
                       listenerBorder: themeColor('--gray-500', '#6b7280'),
                       dispatchable: themeColor('--success-50', '#f0fdf4'),
                       dispatchableBorder: themeColor('--success-600', '#16a34a'),
+                      view: themeColor('--color-white', '#ffffff'),
+                      viewBorder: themeColor('--primary-500', '#6366f1'),
+                      component: themeColor('--info-50', '#eff6ff'),
+                      componentBorder: themeColor('--info-500', '#3b82f6'),
+                      external: themeColor('--gray-50', '#f9fafb'),
+                      externalBorder: themeColor('--gray-400', '#9ca3af'),
                       selection: themeColor('--warning-600', '#d97706'),
                   }
         },
@@ -332,6 +344,58 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     },
                 },
                 {
+                    selector: 'node[type = "view"]',
+                    style: {
+                        shape: 'rectangle',
+                        'background-color': colors.view,
+                        'border-color': colors.viewBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "view"][kind = "layout"]',
+                    style: {
+                        'border-width': 3.5,
+                        'font-weight': 650,
+                    },
+                },
+                {
+                    selector: 'node[type = "blade_component"]',
+                    style: {
+                        shape: 'round-pentagon',
+                        padding: '16px',
+                        'background-color': colors.component,
+                        'border-color': colors.componentBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "filament_component"]',
+                    style: {
+                        shape: 'hexagon',
+                        padding: '16px',
+                        'background-color': colors.resource,
+                        'border-color': colors.resourceBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "external_view"]',
+                    style: {
+                        'background-color': colors.external,
+                        'border-color': colors.externalBorder,
+                        'border-style': 'dashed',
+                        color: colors.subtitle,
+                    },
+                },
+                {
+                    selector: 'node[type = "dynamic_view"]',
+                    style: {
+                        shape: 'diamond',
+                        padding: '20px',
+                        'background-color': colors.polymorphic,
+                        'border-color': colors.polymorphicBorder,
+                        'border-style': 'dashed',
+                    },
+                },
+                {
                     selector: 'edge',
                     style: {
                         width: 1.75,
@@ -359,7 +423,32 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     },
                 },
                 {
-                    selector: 'edge[type = "model_relation"], edge[type = "route_handled_by_controller"], edge[type = "dispatches"]',
+                    selector: 'edge[type = "view_extends"]',
+                    style: {
+                        width: 2.5,
+                        'line-style': 'solid',
+                        'line-color': colors.viewBorder,
+                        'target-arrow-color': colors.viewBorder,
+                    },
+                },
+                {
+                    selector: 'edge[type = "view_uses_component"]',
+                    style: {
+                        'line-style': 'dotted',
+                        'line-color': colors.componentBorder,
+                        'target-arrow-color': colors.componentBorder,
+                    },
+                },
+                {
+                    selector: 'edge[type = "renders_view"], edge[type = "view_renders_livewire"]',
+                    style: {
+                        'line-style': 'solid',
+                        'line-color': colors.livewireBorder,
+                        'target-arrow-color': colors.livewireBorder,
+                    },
+                },
+                {
+                    selector: 'edge[type = "model_relation"], edge[type = "route_handled_by_controller"], edge[type = "dispatches"], edge[type = "renders_view"], edge[type ^= "view_"]',
                     style: {
                         label: 'data(label)',
                         'font-family': fontFamily,
@@ -431,6 +520,7 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         id: node.id,
                         label: node.subtitle ? `${node.label}\n${node.subtitle}` : node.label,
                         type: node.type,
+                        kind: node.metadata?.kind ?? null,
                     },
                 })),
                 ...graph.edges.map((edge) => ({

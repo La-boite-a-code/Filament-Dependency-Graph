@@ -53,6 +53,20 @@ class DependencyGraphPage extends Page implements HasTable
 
     private const HTTP_TABLE_DATASETS = ['routes', 'events', 'dispatches', 'models'];
 
+    private const VIEW_TABLE_DATASETS = ['views', 'components', 'externals', 'livewire_components'];
+
+    /**
+     * Edges the Views tree follows: rendering and template references.
+     */
+    private const VIEW_TREE_EDGES = [
+        EdgeType::RendersView,
+        EdgeType::ViewExtends,
+        EdgeType::ViewIncludes,
+        EdgeType::ViewUsesComponent,
+        EdgeType::ViewRendersLivewire,
+        EdgeType::ViewReferencesDynamic,
+    ];
+
     protected string $view = 'filament-dependency-graph::page';
 
     protected static ?string $slug = 'dependency-graph';
@@ -347,7 +361,9 @@ class DependencyGraphPage extends Page implements HasTable
 
     public function updatingScope(mixed $scope): void
     {
-        $this->scopeSwitchesDatasets = ($scope === GraphScope::Http->value) !== $this->isHttpScope();
+        $next = GraphScope::tryFrom(is_string($scope) ? $scope : '') ?? GraphScope::Filament;
+
+        $this->scopeSwitchesDatasets = $this->datasetsFor($next) !== $this->availableTableDatasets();
     }
 
     /**
@@ -576,15 +592,23 @@ class DependencyGraphPage extends Page implements HasTable
         $maxDepth = $this->depth ?? (int) $this->configRepository()->get('filament-dependency-graph.graph.default_depth', 2);
         $maxDepth = max($maxDepth, 1);
         $http = $this->currentScope() === GraphScope::Http;
+        $views = $this->currentScope() === GraphScope::Views;
 
-        if ($http) {
+        if ($http || $views) {
             // A route leads through its controller to models, dispatches and
-            // listeners: four levels are needed to read the whole chain.
+            // listeners, a page through its layout to partials and
+            // components: four levels are needed to read the whole chain.
             $maxDepth = max($maxDepth, 4);
         }
 
-        if ($http && ($this->selectedNodeId === null || ! $graph->hasNode($this->selectedNodeId))) {
+        $hasSelection = $this->selectedNodeId !== null && $graph->hasNode($this->selectedNodeId);
+
+        if ($http && ! $hasSelection) {
             return $this->httpTree($graph, $maxDepth);
+        }
+
+        if ($views && ! $hasSelection) {
+            return $this->viewsTree($graph, $maxDepth);
         }
 
         $roots = [];
@@ -620,7 +644,11 @@ class DependencyGraphPage extends Page implements HasTable
         foreach ($roots as $rootId) {
             $visited = [];
             $root = $graph->node($rootId);
-            $follow = $http && $root !== null ? $this->httpTreeFilter($graph, $root) : null;
+            $follow = match (true) {
+                $http && $root !== null => $this->httpTreeFilter($graph, $root),
+                $views => $this->viewsTreeFilter(),
+                default => null,
+            };
 
             $tree[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited, $follow);
         }
@@ -677,6 +705,9 @@ class DependencyGraphPage extends Page implements HasTable
             'routes' => 'heroicon-m-globe-alt',
             'events' => 'heroicon-m-megaphone',
             'dispatches' => 'heroicon-m-paper-airplane',
+            'views' => 'heroicon-m-document-text',
+            'components' => 'heroicon-m-puzzle-piece',
+            'externals' => 'heroicon-m-archive-box',
         ];
 
         $options = [];
@@ -697,7 +728,19 @@ class DependencyGraphPage extends Page implements HasTable
      */
     protected function availableTableDatasets(): array
     {
-        return $this->currentScope() === GraphScope::Http ? self::HTTP_TABLE_DATASETS : self::TABLE_DATASETS;
+        return $this->datasetsFor($this->currentScope());
+    }
+
+    /**
+     * @return non-empty-list<string>
+     */
+    protected function datasetsFor(GraphScope $scope): array
+    {
+        return match ($scope) {
+            GraphScope::Http => self::HTTP_TABLE_DATASETS,
+            GraphScope::Views => self::VIEW_TABLE_DATASETS,
+            default => self::TABLE_DATASETS,
+        };
     }
 
     /**
@@ -706,6 +749,71 @@ class DependencyGraphPage extends Page implements HasTable
     protected function getDatasetTableColumns(): array
     {
         return match ($this->tableDataset) {
+            'views' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.view_name'))
+                    ->description(fn (array $record): string => (string) ($record['file'] ?? ''))
+                    ->fontFamily(FontFamily::Mono)
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('kind')
+                    ->label(__('filament-dependency-graph::graph.table.kind'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => __('filament-dependency-graph::graph.view_kinds.' . $state))
+                    ->color('gray')
+                    ->sortable(),
+                TextColumn::make('used_by')
+                    ->label(__('filament-dependency-graph::graph.table.used_by'))
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('uses')
+                    ->label(__('filament-dependency-graph::graph.table.uses'))
+                    ->numeric()
+                    ->sortable(),
+                $this->statusTableColumn(),
+            ],
+            'components' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.component'))
+                    ->description(fn (array $record): string => (string) ($record['detail'] ?? ''))
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('type')
+                    ->label(__('filament-dependency-graph::graph.table.type'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => __('filament-dependency-graph::graph.inspector.types.' . $state))
+                    ->color('gray')
+                    ->sortable(),
+                TextColumn::make('view')
+                    ->label(__('filament-dependency-graph::graph.table.view'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->placeholder('-'),
+                TextColumn::make('used_by')
+                    ->label(__('filament-dependency-graph::graph.table.used_by'))
+                    ->numeric()
+                    ->sortable(),
+                $this->statusTableColumn(),
+            ],
+            'externals' => [
+                TextColumn::make('label')
+                    ->label(__('filament-dependency-graph::graph.table.reference'))
+                    ->fontFamily(FontFamily::Mono)
+                    ->weight(FontWeight::SemiBold)
+                    ->sortable(),
+                TextColumn::make('package')
+                    ->label(__('filament-dependency-graph::graph.table.package'))
+                    ->placeholder('-')
+                    ->sortable(),
+                IconColumn::make('missing')
+                    ->label(__('filament-dependency-graph::graph.table.missing'))
+                    ->boolean()
+                    ->trueColor('danger')
+                    ->falseColor('gray'),
+                TextColumn::make('used_by')
+                    ->label(__('filament-dependency-graph::graph.table.used_by'))
+                    ->numeric()
+                    ->sortable(),
+            ],
             'routes' => [
                 TextColumn::make('label')
                     ->label(__('filament-dependency-graph::graph.table.route'))
@@ -794,6 +902,11 @@ class DependencyGraphPage extends Page implements HasTable
                     ->label(__('filament-dependency-graph::graph.table.methods_count'))
                     ->numeric()
                     ->sortable(),
+                TextColumn::make('used_in_views')
+                    ->label(__('filament-dependency-graph::graph.table.used_in_views'))
+                    ->numeric()
+                    ->sortable()
+                    ->toggleable(),
                 $this->statusTableColumn(),
             ],
             'relations' => [
@@ -976,7 +1089,7 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
-     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, livewire_components: list<array<string, mixed>>, routes: list<array<string, mixed>>, events: list<array<string, mixed>>, dispatches: list<array<string, mixed>>}
+     * @return array{models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, livewire_components: list<array<string, mixed>>, routes: list<array<string, mixed>>, events: list<array<string, mixed>>, dispatches: list<array<string, mixed>>, views: list<array<string, mixed>>, components: list<array<string, mixed>>, externals: list<array<string, mixed>>}
      */
     public function getTables(): array
     {
@@ -991,6 +1104,9 @@ class DependencyGraphPage extends Page implements HasTable
                 'routes' => [],
                 'events' => [],
                 'dispatches' => [],
+                'views' => [],
+                'components' => [],
+                'externals' => [],
             ];
         }
 
@@ -1086,6 +1202,10 @@ class DependencyGraphPage extends Page implements HasTable
                 'models' => is_array($modelIds) ? count($modelIds) : 0,
                 'properties' => is_array($properties) ? count($properties) : 0,
                 'methods' => is_array($methods) ? count($methods) : 0,
+                'used_in_views' => count(array_filter(
+                    $graph->incomingEdges($node->id),
+                    static fn (Edge $edge): bool => $edge->type === EdgeType::ViewRendersLivewire,
+                )),
                 'status' => $node->status->value,
             ];
         }
@@ -1096,6 +1216,87 @@ class DependencyGraphPage extends Page implements HasTable
             'resources' => $this->sortRows($resources),
             'livewire_components' => $this->sortRows($livewireComponents),
             ...$this->httpTables($graph),
+            ...$this->viewTables($graph),
+        ];
+    }
+
+    /**
+     * @return array{views: list<array<string, mixed>>, components: list<array<string, mixed>>, externals: list<array<string, mixed>>}
+     */
+    protected function viewTables(Graph $graph): array
+    {
+        $usedBy = static fn (Node $node): int => count(array_filter(
+            $graph->incomingEdges($node->id),
+            static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true),
+        ));
+
+        $views = [];
+        $components = [];
+        $externals = [];
+
+        foreach ($graph->nodesOfType(NodeType::View) as $node) {
+            $views[] = [
+                'id' => $node->id->value,
+                'label' => $node->label,
+                'file' => $node->metadata['file'] ?? '',
+                'kind' => $node->metadata['kind'] ?? 'partial',
+                'used_by' => $usedBy($node),
+                'uses' => count(array_filter(
+                    $graph->outgoingEdges($node->id),
+                    static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true),
+                )),
+                'status' => $node->status->value,
+            ];
+
+            if (($node->metadata['kind'] ?? null) === 'component') {
+                $components[] = [
+                    'id' => $node->id->value,
+                    'label' => $node->label,
+                    'detail' => $node->metadata['file'] ?? '',
+                    'type' => 'anonymous_component',
+                    'view' => $node->label,
+                    'used_by' => $usedBy($node),
+                    'status' => $node->status->value,
+                ];
+            }
+        }
+
+        foreach ([NodeType::BladeComponent, NodeType::FilamentComponent] as $type) {
+            foreach ($graph->nodesOfType($type) as $node) {
+                $rendered = [];
+
+                foreach ($graph->outgoingEdges($node->id) as $edge) {
+                    if ($edge->type === EdgeType::RendersView) {
+                        $rendered[] = $graph->node($edge->target)->label ?? $edge->target->value;
+                    }
+                }
+
+                $components[] = [
+                    'id' => $node->id->value,
+                    'label' => $node->label,
+                    'detail' => $node->subtitle ?? '',
+                    'type' => $type->value,
+                    'view' => implode(', ', $rendered),
+                    'used_by' => $usedBy($node),
+                    'status' => $node->status->value,
+                ];
+            }
+        }
+
+        foreach ($graph->nodesOfType(NodeType::ExternalView) as $node) {
+            $externals[] = [
+                'id' => $node->id->value,
+                'label' => $node->label,
+                'package' => $node->metadata['package'] ?? null,
+                'missing' => ($node->metadata['missing'] ?? false) === true,
+                'used_by' => $usedBy($node),
+            ];
+        }
+
+        return [
+            'views' => $this->sortRows($views),
+            'components' => $this->sortRows($components),
+            'externals' => $this->sortRows($externals),
         ];
     }
 
@@ -1282,6 +1483,11 @@ class DependencyGraphPage extends Page implements HasTable
         return $this->currentScope() === GraphScope::Http;
     }
 
+    public function isViewsScopeAllowed(): bool
+    {
+        return (bool) $this->configRepository()->get('filament-dependency-graph.views.enabled', true);
+    }
+
     /**
      * Middleware names used by the routes of the HTTP scope.
      *
@@ -1331,12 +1537,16 @@ class DependencyGraphPage extends Page implements HasTable
     {
         $options = [];
 
-        $http = $this->isHttpScope();
+        $scope = $this->currentScope();
 
         foreach (NodeType::cases() as $type) {
-            $relevant = $http
-                ? $type->isHttp() || $type === NodeType::Model || $type === NodeType::LivewireComponent
-                : ! $type->isHttp();
+            $relevant = match ($scope) {
+                GraphScope::Http => $type->isHttp()
+                    || in_array($type, [NodeType::Model, NodeType::LivewireComponent, NodeType::View, NodeType::ExternalView], true),
+                GraphScope::Views => $type->isView()
+                    || in_array($type, [NodeType::LivewireComponent, NodeType::Route, NodeType::Controller, NodeType::Mailable, NodeType::Notification], true),
+                default => ! $type->isHttp() && ! $type->isView(),
+            };
 
             if ($relevant) {
                 $options[$type->value] = __('filament-dependency-graph::graph.node_types.' . $type->value);
@@ -1366,7 +1576,8 @@ class DependencyGraphPage extends Page implements HasTable
 
         return match (true) {
             $scope === GraphScope::Laravel && ! $this->isLaravelScopeAllowed(),
-            $scope === GraphScope::Http && ! $this->isHttpScopeAllowed() => GraphScope::Filament,
+            $scope === GraphScope::Http && ! $this->isHttpScopeAllowed(),
+            $scope === GraphScope::Views && ! $this->isViewsScopeAllowed() => GraphScope::Filament,
             default => $scope,
         };
     }
@@ -1542,6 +1753,69 @@ class DependencyGraphPage extends Page implements HasTable
     }
 
     /**
+     * The Views tree starts from the owners rendering views, grouped by
+     * kind, and ends with the templates nothing references.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function viewsTree(Graph $graph, int $maxDepth): array
+    {
+        $groups = [
+            'routes' => [NodeType::Route, NodeType::Controller],
+            'livewire' => [NodeType::LivewireComponent],
+            'filament' => [NodeType::FilamentComponent],
+            'blade_components' => [NodeType::BladeComponent],
+            'mail' => [NodeType::Mailable, NodeType::Notification],
+        ];
+
+        $tree = [];
+
+        foreach ($groups as $group => $types) {
+            $owners = [];
+
+            foreach ($types as $type) {
+                foreach ($graph->nodesOfType($type) as $node) {
+                    foreach ($graph->outgoingEdges($node->id) as $edge) {
+                        if ($edge->type === EdgeType::RendersView) {
+                            $owners[] = $node;
+
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($owners !== []) {
+                usort($owners, static fn (Node $a, Node $b): int => strcmp($a->label, $b->label));
+                $tree[] = $this->treeGroup('group:' . $group, __('filament-dependency-graph::graph.tree.groups.' . $group), $graph, $owners, $maxDepth, $this->viewsTreeFilter());
+            }
+        }
+
+        $unreferenced = array_values(array_filter(
+            $graph->nodesOfType(NodeType::View),
+            static fn (Node $view): bool => in_array('No reference found', $view->badges, true),
+        ));
+
+        if ($unreferenced !== []) {
+            $tree[] = $this->treeGroup(
+                'group:unreferenced-views',
+                __('filament-dependency-graph::graph.tree.unreferenced_views'),
+                $graph,
+                $unreferenced,
+                $maxDepth,
+                $this->viewsTreeFilter(),
+            );
+        }
+
+        return $tree;
+    }
+
+    protected function viewsTreeFilter(): Closure
+    {
+        return static fn (Edge $edge): bool => in_array($edge->type, self::VIEW_TREE_EDGES, true);
+    }
+
+    /**
      * The HTTP tree reads like one request: model relations are left to the
      * other scopes, and below a controller only the edges of the action the
      * route calls are followed.
@@ -1581,15 +1855,16 @@ class DependencyGraphPage extends Page implements HasTable
 
     /**
      * @param  list<Node>  $nodes
+     * @param  (Closure(Edge): (bool|string))|null  $follow  Defaults to the HTTP rules of each root.
      * @return array<string, mixed>
      */
-    protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth): array
+    protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth, ?Closure $follow = null): array
     {
         $children = [];
 
         foreach ($nodes as $node) {
             $visited = [];
-            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited, $this->httpTreeFilter($graph, $node));
+            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited, $follow ?? $this->httpTreeFilter($graph, $node));
         }
 
         return [

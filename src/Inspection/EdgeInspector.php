@@ -93,7 +93,7 @@ final class EdgeInspector
     {
         $entries = ['Type' => str_replace('_', ' ', $edge->type->value)];
 
-        foreach (['methods' => 'Methods', 'sources' => 'Sources', 'via' => 'Via', 'locations' => 'Locations'] as $key => $label) {
+        foreach (['methods' => 'Methods', 'sources' => 'Sources', 'via' => 'Via', 'locations' => 'Locations', 'directives' => 'Directives', 'hows' => 'Rendered through'] as $key => $label) {
             $values = $edge->metadata[$key] ?? [];
             $values = array_values(array_filter(is_array($values) ? $values : [], 'is_string'));
 
@@ -102,7 +102,13 @@ final class EdgeInspector
             }
         }
 
-        foreach (['kind' => 'Kind', 'method' => 'Method', 'source' => 'Resolved by', 'confidence' => 'Detection'] as $key => $label) {
+        $lines = $edge->metadata['lines'] ?? [];
+
+        if (is_array($lines) && $lines !== []) {
+            $entries['Lines'] = array_values(array_map('strval', $lines));
+        }
+
+        foreach (['kind' => 'Kind', 'method' => 'Method', 'source' => 'Resolved by', 'confidence' => 'Detection', 'file' => 'File', 'view' => 'View'] as $key => $label) {
             $value = $this->string($edge, $key);
 
             if ($value !== null) {

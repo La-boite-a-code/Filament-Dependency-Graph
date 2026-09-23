@@ -58,6 +58,7 @@ use LaBoiteACode\DependencyGraph\Inspection\LivewireComponentInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ModelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\PanelInspector;
 use LaBoiteACode\DependencyGraph\Inspection\ResourceInspector;
+use LaBoiteACode\DependencyGraph\Inspection\ViewNodeInspector;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 
@@ -151,6 +152,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
                 new ResourceInspector,
                 new LivewireComponentInspector,
                 new HttpNodeInspector,
+                new ViewNodeInspector,
                 new PanelInspector,
             ]);
         });
