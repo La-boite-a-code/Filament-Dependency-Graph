@@ -76,6 +76,15 @@ final class LivewireAdapter
     }
 
     /**
+     * Livewire 4 renders the view a component returns from view() when it
+     * has no render() method; on Livewire 3, view() is an ordinary method.
+     */
+    public function readsProvidedViews(): bool
+    {
+        return $this->container->bound('livewire.finder');
+    }
+
+    /**
      * The layout of full-page components that do not declare one:
      * component_layout on Livewire 4, layout on Livewire 3.
      */

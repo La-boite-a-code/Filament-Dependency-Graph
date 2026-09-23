@@ -419,7 +419,8 @@ final class NodeFactory
         if ($owner->ownerType === ViewOwnerData::TYPE_ROUTE) {
             // The route label reads "GET|POST /uri".
             [$methods, $uri] = array_pad(explode(' ', $owner->label, 2), 2, '/');
-            $route = ['methods' => explode('|', $methods), 'uri' => ltrim($uri, '/'), 'name' => $owner->detail];
+            $uri = ltrim($uri, '/');
+            $route = ['methods' => explode('|', $methods), 'uri' => $uri === '' ? '/' : $uri, 'name' => $owner->detail];
         }
 
         return new Node(

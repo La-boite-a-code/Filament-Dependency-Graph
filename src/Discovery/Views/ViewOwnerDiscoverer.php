@@ -164,19 +164,22 @@ final class ViewOwnerDiscoverer
 
         // A multi-file component keeps its class next to its template.
         $sources = [$component->path, substr($component->path, 0, -strlen('.blade.php')) . '.php'];
-        $layout = null;
+        $source = '';
 
-        foreach ($sources as $source) {
-            $contents = is_file($source) ? @file_get_contents($source) : false;
-
-            if (is_string($contents) && preg_match('/#\[\s*\\\\?(?:Livewire\\\\Attributes\\\\)?Layout\s*\(\s*(?:name\s*:\s*)?[\'"]([^\'"]+)[\'"]/', $contents, $match) === 1) {
-                $layout = $match[1];
-
-                break;
-            }
+        foreach ($sources as $path) {
+            $contents = is_file($path) ? @file_get_contents($path) : false;
+            // Comments never declare a layout.
+            $source .= is_string($contents) ? (string) preg_replace('~/\*.*?\*/|(?<![:\'"])//[^\n]*~s', '', $contents) : '';
         }
 
-        $layout ??= $resolver->livewireDefaultLayout();
+        $declared = preg_match('/#\[[^\]]*?\bLayout\s*\(\s*(?:name\s*:\s*)?[\'"]([^\'"]+)[\'"]|->layout\s*\(\s*[\'"]([^\'"]+)[\'"]/', $source, $match) === 1;
+        $layout = match (true) {
+            $declared => $match[1] !== '' ? $match[1] : $match[2],
+            // A layout declared some other way (a constant, a variable) is
+            // not guessed, and the default would be wrong.
+            preg_match('/\bLayout\s*\(|->layout\s*\(/', $source) === 1 => null,
+            default => $resolver->livewireDefaultLayout(),
+        };
 
         if ($layout !== null) {
             $renders[] = new RenderedView($resolver->view($layout)->id, $layout, 'layout', null);
@@ -216,9 +219,16 @@ final class ViewOwnerDiscoverer
                 }
             }
 
-            // Without render() nor view() (Livewire 4), Livewire renders the
-            // view named after the component under its view path.
-            if (! $class->hasMethod('render') && ! $class->hasMethod('view')) {
+            // Without render(), Livewire 4 renders the view returned by
+            // view(), and otherwise the view named after the component under
+            // its view path.
+            $providesView = ! $class->hasMethod('render') && $class->hasMethod('view') && $resolver->livewireReadsProvidedViews();
+
+            if ($providesView) {
+                foreach ($this->literals($class, 'view') as $literal) {
+                    $renders[] = new RenderedView($resolver->view($literal['name'])->id, $literal['name'], 'render', 'view');
+                }
+            } elseif (! $class->hasMethod('render')) {
                 $convention = $resolver->livewireConventionView($component->class, $component->alias);
 
                 if ($convention !== null) {

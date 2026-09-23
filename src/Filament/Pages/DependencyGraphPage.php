@@ -606,7 +606,9 @@ class DependencyGraphPage extends Page implements HasTable
         }
 
         $maxDepth = $this->depth ?? (int) $this->configRepository()->get('filament-dependency-graph.graph.default_depth', 2);
-        $maxDepth = max($maxDepth, 1);
+        // The depth is a public property: keep the tree bounded whatever a
+        // client sends.
+        $maxDepth = min(max($maxDepth, 1), 8);
         $http = $this->currentScope() === GraphScope::Http;
         $views = $this->currentScope() === GraphScope::Views;
 
@@ -1785,8 +1787,9 @@ class DependencyGraphPage extends Page implements HasTable
         ];
 
         $tree = [];
-        // Layouts and partials are shared by many pages: each node is
-        // unfolded once for the whole tree, later occurrences are marked.
+        // Layouts and partials are shared by many pages: a node is not
+        // unfolded again at the same or a lower depth, later occurrences are
+        // marked as already shown.
         $visited = [];
 
         foreach ($groups as $group => $types) {
@@ -1877,7 +1880,7 @@ class DependencyGraphPage extends Page implements HasTable
     /**
      * @param  list<Node>  $nodes
      * @param  (Closure(Edge): (bool|string))|null  $follow  Defaults to the HTTP rules of each root.
-     * @param  array<string, int>|null  $visited  Shared across roots when given; each root still unfolds.
+     * @param  array<string, int>|null  $visited  Shared across roots when given; roots always unfold, having the most depth left.
      * @return array<string, mixed>
      */
     protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth, ?Closure $follow = null, ?array &$visited = null): array

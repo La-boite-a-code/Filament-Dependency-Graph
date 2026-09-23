@@ -123,6 +123,11 @@ final class ViewReferenceResolver
         return $this->livewire->defaultLayout();
     }
 
+    public function livewireReadsProvidedViews(): bool
+    {
+        return $this->livewire->readsProvidedViews();
+    }
+
     /**
      * External views referenced so far, templates and owners alike.
      *

@@ -5,16 +5,28 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
+use LaBoiteACode\DependencyGraph\Discovery\Http\RouteDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\Views\BladeTemplateScanner;
+use LaBoiteACode\DependencyGraph\Discovery\Views\ViewOwnerDiscoverer;
+use LaBoiteACode\DependencyGraph\Discovery\Views\ViewReferenceResolver;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\HttpMapData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewMapData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewOwnerData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
+use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
+use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
+use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
+use LaBoiteACode\DependencyGraph\Graph\NodeFactory;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\FilamentViews\Widgets\StatsWidget;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Livewire\StandaloneCounter;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\View\Components\Alert;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\ViewOwners\ProvidedViewComponent;
 
 function viewMap(mixed ...$overrides): ViewMapData
 {
@@ -286,4 +298,101 @@ it('names anonymous components by the prefix the application chose', function ()
         ->and(array_filter($externals, static fn (string $reference): bool => preg_match('/^[0-9a-f]{32}::/', $reference) === 1))->toBe([])
         ->and($explored)->toHaveKey('kit::button')
         ->and(array_filter(array_keys($explored), static fn (string $name): bool => preg_match('/^[0-9a-f]{32}::/', $name) === 1))->toBe([]);
+});
+
+it('reads the layout declared by routed single and multi-file components', function (): void {
+    if (! Route::hasMacro('livewire')) {
+        $this->markTestSkipped('Route::livewire() needs Livewire 4.');
+    }
+
+    $path = dirname(__DIR__, 2) . '/Fixtures/views-livewire4';
+    app('view')->getFinder()->addLocation($path);
+    app('livewire.finder')->addLocation(viewPath: $path . '/livewire');
+    config()->set('livewire.component_layout', 'partials.default-nav');
+
+    Route::livewire('with-layout', 'with-layout');
+    Route::livewire('panel-page', 'panel');
+    Route::livewire('counter-page', 'counter');
+
+    $snapshot = app(ApplicationDiscovery::class)->discover($this->fixtureContext());
+    $renders = [];
+
+    foreach ($snapshot->views->owners as $owner) {
+        if ($owner->ownerType === ViewOwnerData::TYPE_ROUTE) {
+            $renders[$owner->label] = array_map(static fn ($rendered): string => $rendered->how . ' ' . $rendered->targetId, $owner->renders);
+        }
+    }
+
+    expect($renders)->toMatchArray([
+        // The commented-out attribute is ignored.
+        'GET /with-layout' => ['Route::livewire view:livewire.with-layout', 'layout view:layouts.app'],
+        // Several attributes in one group, declared in the class file.
+        'GET /panel-page' => ['Route::livewire view:livewire.panel.panel', 'layout view:pages.about'],
+        // Nothing declared: the configured layout.
+        'GET /counter-page' => ['Route::livewire view:livewire.counter', 'layout view:partials.default-nav'],
+    ]);
+});
+
+it('keeps single-file components of vendor packages out of the routes', function (): void {
+    if (! Route::hasMacro('livewire')) {
+        $this->markTestSkipped('Route::livewire() needs Livewire 4.');
+    }
+
+    $path = dirname(__DIR__, 2) . '/Fixtures/views-livewire4';
+    app('livewire.finder')->addLocation(viewPath: $path . '/livewire');
+    Route::livewire('packaged-counter', 'counter');
+
+    $uris = static fn (DiscoveryContext $context): array => array_map(
+        static fn (RouteData $route): string => $route->uri,
+        app(RouteDiscoverer::class)->discover($context),
+    );
+
+    // The fixture folder stands for a vendor package here.
+    expect($uris($this->fixtureContext(vendorPath: $path)))->not->toContain('packaged-counter')
+        ->and($uris($this->fixtureContext(vendorPath: $path, includeVendorRoutes: true)))->toContain('packaged-counter')
+        ->and($uris($this->fixtureContext()))->toContain('packaged-counter');
+});
+
+it('reads the view Livewire 4 components provide through view()', function (): void {
+    $context = $this->fixtureContext();
+    $resolver = app(ViewReferenceResolver::class);
+    $resolver->prepare(app(BladeTemplateScanner::class)->templates($context), $context);
+
+    $component = new LivewireComponentData(
+        id: StableIdentifier::livewireComponent(ProvidedViewComponent::class),
+        class: ProvidedViewComponent::class,
+        shortName: 'ProvidedViewComponent',
+        namespace: 'LaBoiteACode\\DependencyGraph\\Tests\\Fixtures\\ViewOwners',
+        alias: 'provided-view-component',
+        view: null,
+        file: null,
+        publicProperties: [],
+        publicMethods: ['view'],
+        modelReferences: [],
+        status: DiscoveryStatus::Complete,
+        warnings: [],
+    );
+
+    $owner = collect(app(ViewOwnerDiscoverer::class)->discover($context, $resolver, [$component], [], new HttpMapData))
+        ->firstWhere('class', ProvidedViewComponent::class);
+
+    // On Livewire 3, view() is an ordinary method: nothing is rendered.
+    expect($owner?->renders[0]->name ?? null)->toBe(app()->bound('livewire.finder') ? 'partials.nav' : null);
+});
+
+it('describes routes rendering views when the HTTP map does not', function (): void {
+    $node = app(NodeFactory::class)->forViewOwner(new ViewOwnerData(
+        id: 'route:get:home',
+        ownerType: ViewOwnerData::TYPE_ROUTE,
+        class: null,
+        label: 'GET /',
+        detail: 'home',
+        file: null,
+        renders: [],
+        status: DiscoveryStatus::Complete,
+        warnings: [],
+    ));
+
+    expect($node->type)->toBe(NodeType::Route)
+        ->and($node->metadata)->toMatchArray(['methods' => ['GET'], 'uri' => '/', 'name' => 'home']);
 });
