@@ -12,6 +12,7 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Edge;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
+use LaBoiteACode\DependencyGraph\Inspection\Concerns\DescribesViewEdges;
 use LaBoiteACode\DependencyGraph\Support\ClassName;
 
 /**
@@ -20,6 +21,8 @@ use LaBoiteACode\DependencyGraph\Support\ClassName;
  */
 final class HttpNodeInspector implements NodeInspector
 {
+    use DescribesViewEdges;
+
     public function supports(Node $node): bool
     {
         return $node->type->isHttp();
@@ -36,6 +39,12 @@ final class HttpNodeInspector implements NodeInspector
             NodeType::Listener => $this->listener($node, $graph),
             default => $this->dispatchable($node, $graph),
         };
+
+        $views = $this->renderedViews($node, $graph);
+
+        if ($views !== []) {
+            $sections[] = new InspectionSection('views', 'Views', ['Renders' => $views]);
+        }
 
         return new InspectionData(
             subjectId: $node->id->value,
@@ -68,7 +77,7 @@ final class HttpNodeInspector implements NodeInspector
                 'Type' => $this->string($node, 'action_type'),
                 'Controller' => $this->string($node, 'controller_class'),
                 'Method' => $this->string($node, 'controller_method'),
-                'Livewire component' => $this->string($node, 'livewire_class'),
+                'Livewire component' => $this->string($node, 'livewire_class') ?? $this->string($node, 'livewire_component'),
                 'View' => $this->string($node, 'view'),
                 'File' => $this->string($node, 'file'),
             ]),

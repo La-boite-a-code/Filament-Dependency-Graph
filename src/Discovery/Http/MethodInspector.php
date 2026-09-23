@@ -64,7 +64,18 @@ final class MethodInspector
         $models = array_values(array_unique($models));
         sort($models, SORT_STRING);
 
-        return new MethodFindings($models, $this->uniqueDispatches($dispatches), true);
+        $views = [];
+
+        foreach ($source->viewLiterals() as $literal) {
+            if ($literal['how'] === 'view') {
+                $views[$literal['name']] = true;
+            }
+        }
+
+        $views = array_keys($views);
+        sort($views, SORT_STRING);
+
+        return new MethodFindings($models, $this->uniqueDispatches($dispatches), true, $views);
     }
 
     /**

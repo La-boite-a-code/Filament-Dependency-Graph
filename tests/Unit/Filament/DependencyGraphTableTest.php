@@ -95,6 +95,7 @@ it('defines the expected native Filament columns for every dataset', function ()
             'models',
             'properties',
             'methods',
+            'used_in_views',
             'status',
         ],
         'relations' => [

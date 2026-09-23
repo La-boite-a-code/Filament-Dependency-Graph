@@ -7,6 +7,7 @@ namespace LaBoiteACode\DependencyGraph\Domain\DTO;
 use DateTimeImmutable;
 use DateTimeInterface;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\HttpMapData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewMapData;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
 
 final readonly class ApplicationSnapshot
@@ -29,6 +30,7 @@ final readonly class ApplicationSnapshot
         public array $warnings,
         public array $livewireComponents = [],
         public HttpMapData $http = new HttpMapData,
+        public ViewMapData $views = new ViewMapData,
     ) {}
 
     /**
@@ -36,7 +38,7 @@ final readonly class ApplicationSnapshot
      */
     public static function fromArray(array $data): self
     {
-        /** @var array{fingerprint: string, generated_at: string, models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, panels: list<array{id: string, path: string|null, domain: string|null, resource_ids: list<string>}>, warnings: list<array{type: string, message: string, class?: string|null, method?: string|null, exception_class?: string|null}>, livewire_components?: list<array<string, mixed>>, http?: array<string, mixed>} $data */
+        /** @var array{fingerprint: string, generated_at: string, models: list<array<string, mixed>>, relations: list<array<string, mixed>>, resources: list<array<string, mixed>>, panels: list<array{id: string, path: string|null, domain: string|null, resource_ids: list<string>}>, warnings: list<array{type: string, message: string, class?: string|null, method?: string|null, exception_class?: string|null}>, livewire_components?: list<array<string, mixed>>, http?: array<string, mixed>, views?: array<string, mixed>} $data */
         return new self(
             fingerprint: $data['fingerprint'],
             generatedAt: new DateTimeImmutable($data['generated_at']),
@@ -65,6 +67,7 @@ final readonly class ApplicationSnapshot
                 $data['livewire_components'] ?? [],
             ),
             http: HttpMapData::fromArray($data['http'] ?? []),
+            views: ViewMapData::fromArray($data['views'] ?? []),
         );
     }
 
@@ -97,6 +100,7 @@ final readonly class ApplicationSnapshot
                 $this->livewireComponents,
             ),
             'http' => $this->http->toArray(),
+            'views' => $this->views->toArray(),
             'warnings' => array_map(
                 static fn (DiscoveryWarning $warning): array => $warning->toArray(),
                 $this->warnings,

@@ -9,8 +9,10 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Customer;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Order;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Product;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\User;
+use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+#[Layout('layouts.app')]
 final class OrderDashboard extends Component
 {
     public Order $order;

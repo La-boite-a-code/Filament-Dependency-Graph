@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers;
 
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Actions\PlaceOrder;
@@ -26,9 +27,9 @@ final class OrderController
         self::$instances++;
     }
 
-    public function index(): string
+    public function index(): View
     {
-        return (string) Order::query()->count();
+        return view('orders.index', ['count' => Order::query()->count()]);
     }
 
     public function store(StoreOrderRequest $request, PlaceOrder $placeOrder): string

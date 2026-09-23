@@ -20,6 +20,11 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\RelationManagerData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ResourceData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\DynamicViewData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ExternalViewData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewOwnerData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Views\ViewReference;
 use LaBoiteACode\DependencyGraph\Domain\Enums\DiscoveryStatus;
 use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
@@ -181,6 +186,7 @@ final class NodeFactory
                 'controller_class' => $route->controllerClass,
                 'controller_method' => $route->controllerMethod,
                 'livewire_class' => $route->livewireClass,
+                'livewire_component' => $route->livewireComponent,
                 'view' => $route->view,
                 'middleware' => $route->middleware,
                 'resolved_middleware' => $route->resolvedMiddleware,
@@ -361,6 +367,113 @@ final class NodeFactory
             ],
             badges: ['Polymorphic'],
             status: $relation->status,
+        );
+    }
+
+    /**
+     * @param  list<string>  $badges
+     */
+    public function forView(ViewData $view, array $badges = []): Node
+    {
+        if ($view->status->isPartial()) {
+            $badges[] = 'Partial';
+        }
+
+        return new Node(
+            id: NodeId::fromString($view->id),
+            type: NodeType::View,
+            label: $view->name,
+            subtitle: $view->kind,
+            metadata: [
+                'name' => $view->name,
+                'file' => $view->file,
+                'kind' => $view->kind,
+                'references' => array_map(static fn (ViewReference $reference): array => $reference->toArray(), $view->references),
+                'warnings' => $view->warnings,
+            ],
+            badges: $badges,
+            status: $view->status,
+        );
+    }
+
+    /**
+     * Blade class components, Filament classes, and the routes,
+     * controllers, mailables or notifications known through the views they
+     * render when the HTTP map does not describe them.
+     *
+     * @param  list<string>  $badges
+     */
+    public function forViewOwner(ViewOwnerData $owner, array $badges = []): Node
+    {
+        $type = match ($owner->ownerType) {
+            ViewOwnerData::TYPE_BLADE_COMPONENT => NodeType::BladeComponent,
+            ViewOwnerData::TYPE_FILAMENT => NodeType::FilamentComponent,
+            ViewOwnerData::TYPE_ROUTE => NodeType::Route,
+            ViewOwnerData::TYPE_CONTROLLER => NodeType::Controller,
+            ViewOwnerData::TYPE_NOTIFICATION => NodeType::Notification,
+            default => NodeType::Mailable,
+        };
+
+        $route = [];
+
+        if ($owner->ownerType === ViewOwnerData::TYPE_ROUTE) {
+            // The route label reads "GET|POST /uri".
+            [$methods, $uri] = array_pad(explode(' ', $owner->label, 2), 2, '/');
+            $uri = ltrim($uri, '/');
+            $route = ['methods' => explode('|', $methods), 'uri' => $uri === '' ? '/' : $uri, 'name' => $owner->detail];
+        }
+
+        return new Node(
+            id: NodeId::fromString($owner->id),
+            type: $type,
+            label: $owner->label,
+            subtitle: $owner->detail,
+            metadata: [
+                'class' => $owner->class,
+                'namespace' => $owner->class === null ? null : ClassName::namespace($owner->class),
+                'file' => $owner->file,
+                'owner_type' => $owner->ownerType,
+                'detail' => $owner->detail,
+                'warnings' => $owner->warnings,
+                ...$route,
+            ],
+            badges: $owner->status->isPartial() ? [...$badges, 'Partial'] : $badges,
+            status: $owner->status,
+        );
+    }
+
+    public function forExternalView(ExternalViewData $external): Node
+    {
+        return new Node(
+            id: NodeId::fromString($external->id),
+            type: NodeType::ExternalView,
+            label: $external->reference,
+            subtitle: $external->missing ? 'missing' : $external->package,
+            metadata: [
+                'reference' => $external->reference,
+                'package' => $external->package,
+                'missing' => $external->missing,
+            ],
+            badges: $external->missing ? ['Missing'] : [],
+            status: DiscoveryStatus::Complete,
+        );
+    }
+
+    public function forDynamicView(DynamicViewData $dynamic): Node
+    {
+        return new Node(
+            id: NodeId::fromString($dynamic->id),
+            type: NodeType::DynamicView,
+            label: 'Dynamic view',
+            subtitle: $dynamic->expression,
+            metadata: [
+                'source_view_id' => $dynamic->sourceViewId,
+                'directive' => $dynamic->directive,
+                'expression' => $dynamic->expression,
+                'line' => $dynamic->line,
+            ],
+            badges: ['Dynamic'],
+            status: DiscoveryStatus::Complete,
         );
     }
 

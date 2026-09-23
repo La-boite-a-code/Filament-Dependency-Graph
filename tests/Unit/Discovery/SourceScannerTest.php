@@ -187,3 +187,26 @@ it('keeps only the most recently read files in memory', function (): void {
     array_map('unlink', glob("{$directory}/*.php") ?: []);
     @rmdir($directory);
 });
+
+it('lists literal view names with how they are rendered', function (): void {
+    $source = (new SourceScanner)->method(new ReflectionMethod(LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Scanning\ViewsSubject::class, 'render'));
+
+    expect(array_map(
+        static fn (array $literal): string => $literal['how'] . ' ' . $literal['name'],
+        $source->viewLiterals(),
+    ))->toBe([
+        'view orders.index',
+        'view orders.show',
+        'view orders.legacy',
+        'view errors.custom',
+        'layout layouts.admin',
+        'view mail.html',
+        'markdown mail.markdown',
+        'text mail.text',
+        'markdown mail.notification',
+        'view orders.qualified',
+        'view orders.helper',
+        'view mail.html-version',
+        'layout layouts.legacy',
+    ]);
+});

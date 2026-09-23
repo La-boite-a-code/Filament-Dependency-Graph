@@ -17,4 +17,31 @@ enum EdgeType: string
     case ModelGuardedByPolicy = 'model_guarded_by_policy';
     case EventHandledByListener = 'event_handled_by_listener';
     case Dispatches = 'dispatches';
+    case RendersView = 'renders_view';
+    case ViewExtends = 'view_extends';
+    case ViewIncludes = 'view_includes';
+    case ViewUsesComponent = 'view_uses_component';
+    case ViewRendersLivewire = 'view_renders_livewire';
+    case ViewReferencesDynamic = 'view_references_dynamic';
+
+    /**
+     * Edges from a template to what it references.
+     *
+     * @return list<self>
+     */
+    public static function viewReferences(): array
+    {
+        return [
+            self::ViewExtends,
+            self::ViewIncludes,
+            self::ViewUsesComponent,
+            self::ViewRendersLivewire,
+            self::ViewReferencesDynamic,
+        ];
+    }
+
+    public function isViewReference(): bool
+    {
+        return in_array($this, self::viewReferences(), true);
+    }
 }

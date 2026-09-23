@@ -159,6 +159,106 @@ final readonly class MethodSource
         return $calls;
     }
 
+    /**
+     * Literal view names: view('x'), View::make('x'), ->view('x'),
+     * ->markdown('x'), ->text('x'), ->layout('x'), and the view:, markdown:
+     * and text: named arguments of mail content definitions.
+     *
+     * @return list<array{name: string, how: string, line: int}>
+     */
+    public function viewLiterals(): array
+    {
+        $literals = [];
+
+        foreach ($this->tokens as $index => $token) {
+            $isFunctionName = $token->is(T_NAME_FULLY_QUALIFIED) && strtolower(ltrim($token->text, '\\')) === 'view';
+
+            if (! $token->is(T_STRING) && ! $isFunctionName) {
+                continue;
+            }
+
+            $name = strtolower(ltrim($token->text, '\\'));
+            $isMethodCall = $this->at($index - 1, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR]);
+
+            $how = match (true) {
+                in_array($name, ['view', 'markdown', 'text', 'html'], true) && $this->at($index + 1, ':') => $name === 'html' ? 'view' : $name,
+                $name === 'view' && $this->at($index + 1, '(') => 'view',
+                in_array($name, ['markdown', 'text', 'layout', 'extends'], true) && $isMethodCall && $this->at($index + 1, '(') => $name === 'extends' ? 'layout' : $name,
+                $name === 'make' && $this->at($index + 1, '(') && ($this->isViewFacadeCall($index) || $this->isViewHelperCall($index)) => 'view',
+                default => null,
+            };
+
+            $literal = $this->tokens[$index + 2] ?? null;
+
+            // A literal followed by anything but "," or ")" is only the start
+            // of a computed name: view('orders.' . $type).
+            if (
+                $how !== null
+                && $literal !== null
+                && $literal->is(T_CONSTANT_ENCAPSED_STRING)
+                && $this->at($index + 3, [',', ')'])
+            ) {
+                $literals[] = ['name' => stripcslashes(substr($literal->text, 1, -1)), 'how' => $how, 'line' => $token->line];
+            }
+        }
+
+        return $literals;
+    }
+
+    /**
+     * View::make('x').
+     */
+    private function isViewFacadeCall(int $makeIndex): bool
+    {
+        return $this->at($makeIndex - 1, T_DOUBLE_COLON) && $this->isViewFacade($makeIndex - 2);
+    }
+
+    /**
+     * view()->make('x').
+     */
+    private function isViewHelperCall(int $makeIndex): bool
+    {
+        $helper = $this->tokens[$makeIndex - 4] ?? null;
+
+        return $this->at($makeIndex - 1, [T_OBJECT_OPERATOR, T_NULLSAFE_OBJECT_OPERATOR])
+            && $this->at($makeIndex - 2, ')')
+            && $this->at($makeIndex - 3, '(')
+            && $helper !== null
+            && strtolower(ltrim($helper->text, '\\')) === 'view';
+    }
+
+    /**
+     * String literals returned as is: "return 'filament.pages.reports';".
+     *
+     * @return list<array{name: string, line: int}>
+     */
+    public function returnedStringLiterals(): array
+    {
+        $literals = [];
+
+        foreach ($this->tokens as $index => $token) {
+            $literal = $this->tokens[$index + 1] ?? null;
+
+            if ($token->is(T_RETURN) && $literal !== null && $literal->is(T_CONSTANT_ENCAPSED_STRING) && $this->at($index + 2, ';')) {
+                $literals[] = ['name' => stripcslashes(substr($literal->text, 1, -1)), 'line' => $token->line];
+            }
+        }
+
+        return $literals;
+    }
+
+    private function isViewFacade(int $index): bool
+    {
+        $token = $this->tokens[$index] ?? null;
+
+        if ($token === null || ! SourceScanner::isClassName($token)) {
+            return false;
+        }
+
+        return in_array(ltrim((string) $this->resolve($token->text), '\\'), ['View', 'Illuminate\\Support\\Facades\\View'], true)
+            || ltrim($token->text, '\\') === 'View';
+    }
+
     private function resolve(string $reference): ?string
     {
         return $this->scanner->resolveClass($reference, $this->file->namespace, $this->file->imports);

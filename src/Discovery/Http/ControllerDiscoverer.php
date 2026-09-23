@@ -171,6 +171,7 @@ final class ControllerDiscoverer
             formRequests: $formRequests,
             models: $models,
             dispatches: $findings->dispatches,
+            views: $findings->views,
         );
     }
 

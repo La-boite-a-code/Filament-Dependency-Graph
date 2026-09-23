@@ -94,3 +94,18 @@ it('labels controller methods and dispatch kinds in the HTTP map', function (): 
         ->and($output)->toContain('controller_app_order_controller -- job --> job_app_ship_order')
         ->and($output)->toContain('controller_app_order_controller --> form_request_app_store_order');
 });
+
+it('keeps directives and component tags readable on view edges', function (): void {
+    $graph = fakeGraph(
+        [fakeNode('view:orders.index', label: 'orders.index'), fakeNode('view:partials.row', label: 'partials.row'), fakeNode('blade-component:alert', label: 'Alert')],
+        [
+            fakeEdge('view:orders.index', 'view:partials.row', EdgeType::ViewIncludes, '@include, @each'),
+            fakeEdge('view:orders.index', 'blade-component:alert', EdgeType::ViewUsesComponent, '<x-alert>'),
+        ],
+    );
+
+    $output = (new MermaidGraphExporter)->export($graph, new ExportOptions);
+
+    expect($output)->toContain('view_orders_index -->|"@include, @each"| view_partials_row')
+        ->and($output)->toContain('view_orders_index -->|"#lt;x-alert#gt;"| blade_component_alert');
+});

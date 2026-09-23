@@ -29,6 +29,10 @@ final readonly class DiscoveryContext
      * @param  list<string>  $httpApplicationNamespaces
      * @param  list<string>  $excludedRouteNames  Str::is() patterns.
      * @param  list<string>  $excludedRouteUris  Str::is() patterns.
+     * @param  list<string>  $bladeComponentPaths
+     * @param  list<string>  $filamentViewPaths
+     * @param  list<string>  $mailPaths
+     * @param  list<string>  $excludedViews  Str::is() patterns on view names.
      */
     public function __construct(
         public GraphScope $scope = GraphScope::Filament,
@@ -58,6 +62,13 @@ final readonly class DiscoveryContext
         public array $excludedRouteUris = [],
         public bool $followInjectedClasses = true,
         public bool $invokeFormRequestRules = false,
+        public bool $discoverViews = true,
+        public bool $includeVendorViewOverrides = false,
+        public bool $explorePackageViews = false,
+        public array $bladeComponentPaths = [],
+        public array $filamentViewPaths = [],
+        public array $mailPaths = [],
+        public array $excludedViews = [],
     ) {}
 
     public function withScope(GraphScope $scope): self
@@ -113,6 +124,13 @@ final readonly class DiscoveryContext
             'excluded_route_uris' => $this->excludedRouteUris,
             'follow_injected_classes' => $this->followInjectedClasses,
             'invoke_form_request_rules' => $this->invokeFormRequestRules,
+            'discover_views' => $this->discoverViews,
+            'include_vendor_view_overrides' => $this->includeVendorViewOverrides,
+            'explore_package_views' => $this->explorePackageViews,
+            'blade_component_paths' => $this->bladeComponentPaths,
+            'filament_view_paths' => $this->filamentViewPaths,
+            'mail_paths' => $this->mailPaths,
+            'excluded_views' => $this->excludedViews,
         ];
     }
 
@@ -152,6 +170,13 @@ final readonly class DiscoveryContext
             excludedRouteUris: $this->excludedRouteUris,
             followInjectedClasses: $this->followInjectedClasses,
             invokeFormRequestRules: $this->invokeFormRequestRules,
+            discoverViews: $this->discoverViews,
+            includeVendorViewOverrides: $this->includeVendorViewOverrides,
+            explorePackageViews: $this->explorePackageViews,
+            bladeComponentPaths: $this->bladeComponentPaths,
+            filamentViewPaths: $this->filamentViewPaths,
+            mailPaths: $this->mailPaths,
+            excludedViews: $this->excludedViews,
         );
     }
 }

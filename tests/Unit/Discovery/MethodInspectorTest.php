@@ -62,7 +62,7 @@ it('finds mails and notifications created in a controller action', function (): 
             'mailable OrderShippedMail',
             'notification OrderUpdated',
         ])
-        ->and($findings->dispatches[0]->location)->toBe('tests/Fixtures/Http/Controllers/OrderController.php:49');
+        ->and($findings->dispatches[0]->location)->toBe('tests/Fixtures/Http/Controllers/OrderController.php:50');
 });
 
 it('follows injected action classes one level deep', function (): void {

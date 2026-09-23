@@ -7,7 +7,7 @@
 
 > The visual architecture explorer for Filament.
 
-Explore models, routes, controllers, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
+Explore models, routes, controllers, Blade views, Livewire components, resources, panels and relationships from one visual workspace. Filament Dependency Graph automatically discovers the structure of a Laravel and Filament application and presents it through an interactive, navigable interface: a graph, a tree, a table, a contextual inspector, search, focus mode, filtering and exports.
 
 <p class="filament-hidden">
     <img src="https://raw.githubusercontent.com/La-boite-a-code/Filament-Dependency-Graph/main/art/banner.jpg" alt="Filament Dependency Graph">
@@ -30,17 +30,19 @@ Install the package, register the plugin, open one page, and immediately answer:
 - What surrounds this specific model?
 - Which controller, form request and models does this route reach?
 - What does this action dispatch, and who listens to it?
+- Which layout, partials and components does this page render, and where is this component used?
 
 ## Features
 
 - **Automatic discovery.** Eloquent models and relations, application Livewire components, Filament panels, resources, pages and relation managers, with zero package-specific configuration on standard applications.
 - **Project-wide Livewire visibility.** Components under `app/Livewire` or the legacy `app/Http/Livewire` convention appear in the Laravel scope even when they are not registered in a Filament panel. Typed properties, method signatures and explicit static model references become component-to-model dependencies without instantiating the component.
 - **HTTP map.** A dedicated scope maps every application route to its controller action, form request, route-bound and referenced models, their policies, and the events, jobs, mailables and notifications dispatched along the way, including one level into injected action or service classes. Listeners come from the event dispatcher, so Laravel's event discovery is covered. Nothing is executed to build it.
+- **View map.** A Views scope maps the Blade templates of the application: what each page extends, includes and renders (partials, anonymous and class components, Livewire components), which Livewire components, Filament classes, mailables, routes and controllers render which view, and where every component is used. Package views appear as leaves, missing and dynamic references are flagged, and nothing is compiled or rendered to build it.
 - **Every Eloquent relation type.** belongsTo, hasOne, hasMany, belongsToMany, hasOneThrough, hasManyThrough, morphTo, morphOne, morphMany, morphToMany and morphedByMany, including morph maps.
 - **A readable graph.** Cytoscape.js with a layered dagre layout for the hierarchical mode and fCoSE for the force-directed mode. Relation labels only appear at readable zoom levels, selecting a node fades everything outside its neighborhood, and disconnected models are packed neatly instead of drifting over the graph.
 - **Native Filament look.** The whole page is built from Filament components (sections, tabs, buttons, selects, checkboxes, badges) and the graph palette reads your panel color scales at runtime, in light and dark mode.
 - **Tree and table views** for the same data, usable without the graph renderer.
-- **Contextual inspector** for models, Livewire components, resources, panels, routes, controllers, form requests, policies, events, listeners, dispatched classes and every edge: keys, pivot tables, morph metadata, traits, casts, rendered views, public APIs, middleware, validation rules, dispatch locations and diagnostics.
+- **Contextual inspector** for models, Livewire components, resources, panels, routes, controllers, form requests, policies, events, listeners, dispatched classes, Blade views and components, and every edge: keys, pivot tables, morph metadata, traits, casts, rendered views, public APIs, middleware, validation rules, dispatch locations and diagnostics.
 - **Search** across class names, labels, tables, namespaces, panels, relation methods, route URIs and route names, with deterministic ranking.
 - **Focus mode** with configurable depth and direction, shareable through the URL query string.
 - **Filters.** Panels, node types, relation types, namespace, vendor or application ownership, orphans only, circular dependencies only, models without resources only, and routes with or without a given middleware in the HTTP scope.
@@ -97,7 +99,7 @@ DependencyGraphPlugin::make()
 
 ### Graph view
 
-The default view renders the dependency graph with typed nodes: panels, resource hexagons, Livewire components, model boxes and dashed polymorphic-target diamonds. The HTTP scope adds route tags, controllers, form requests, policy octagons, event rhomboids, dashed listeners and green hexagons for jobs, mailables and notifications, with controller methods and dispatch kinds on the edges. Two layouts are available from the toolbar:
+The default view renders the dependency graph with typed nodes: panels, resource hexagons, Livewire components, model boxes and dashed polymorphic-target diamonds. The HTTP scope adds route tags, controllers, form requests, policy octagons, event rhomboids, dashed listeners and green hexagons for jobs, mailables and notifications, with controller methods and dispatch kinds on the edges. The Views scope draws templates as rectangles (layouts with a thicker border), Blade components as pentagons, Filament classes as hexagons, package views as dashed boxes and dynamic references as dashed diamonds, with the directive or tag (`@include`, `<x-alert>`, `render`) on each edge. Two layouts are available from the toolbar:
 
 - **Hierarchical** (default) - a layered dagre layout: panels on top, then resources, then models, with crossing minimisation.
 - **Force-directed** - fCoSE, which clusters tightly related models together and packs disconnected components side by side.
@@ -108,11 +110,13 @@ Interactions: zoom and pan, drag nodes, click a node or an edge to open the nati
 
 A cycle-safe, depth-limited expansion of the graph starting from the panels (or from the selected node), with the relation method displayed on every branch. Useful for answering "what hangs off this model" linearly.
 
+In the Views scope the tree starts from what renders views - routes and controllers, Livewire, Filament, Blade components, mail - and unfolds each view into its layout, partials and components; templates nothing references are listed in their own group.
+
 In the HTTP scope the tree starts from the routes, grouped by their first URI segment (`/orders`, `/account`...), and reads like a request: route, controller method, form request, models, dispatches, listeners. Events that nothing in the application dispatches are listed in their own group.
 
 ### Table view
 
-A native Filament Table exposes four inventory categories - models, relations, Livewire components and resources - through compact tabs. The HTTP scope swaps them for routes (action, middleware, form requests, models), events (listeners, queued listeners, dispatchers) and dispatched classes (kind, queue, dispatchers), next to the models. Search, sorting, pagination, column visibility and empty states follow the panel behavior automatically. Counts, aliases, views, foreign keys, pivot tables, navigation groups and discovery status remain available, and every row opens the inspector.
+A native Filament Table exposes four inventory categories - models, relations, Livewire components and resources - through compact tabs. The HTTP scope swaps them for routes (action, middleware, form requests, models), events (listeners, queued listeners, dispatchers) and dispatched classes (kind, queue, dispatchers), next to the models. The Views scope shows views (kind, uses, used by), components (Blade classes, anonymous components, Filament classes, with their usage count), package views (missing ones flagged) and Livewire components. Search, sorting, pagination, column visibility and empty states follow the panel behavior automatically. Counts, aliases, views, foreign keys, pivot tables, navigation groups and discovery status remain available, and every row opens the inspector.
 
 ### Inspector
 
@@ -143,7 +147,8 @@ Press `/` and type: the search matches class names, labels, table names, namespa
 
 - **Filament scope** (default): starts from the resources registered in the selected panels and includes their models plus related models up to the configured depth.
 - **Laravel scope**: every discovered Eloquent model and standalone Livewire component, including models that no resource exposes. Disable it entirely with `laravel_scope_enabled => false` or `->allowLaravelScope(false)`.
-- **HTTP scope**: the application routes and everything they lead to - see [HTTP map](#http-map). Disable it, and its discovery, with `http.enabled => false` or `->allowHttpScope(false)`.
+- **HTTP scope**: the application routes and everything they lead to - see [HTTP map](#http-map). Disable it, and its discovery, with `http.enabled => false` or `->allowHttpScope(false)`; the Views scope still reads routes and controller actions to find the views they render. Rendered views appear as leaves, one hop from the route or action that renders them.
+- **Views scope**: the Blade templates and what renders them - see [View map](#view-map). Disable it, and its discovery, with `views.enabled => false` or `->allowViewsScope(false)`.
 
 ## HTTP map
 
@@ -175,6 +180,35 @@ Everything above comes from registries, reflection and a token-level reading of 
 - several namespaces declared in one file: imports are read for the file as a whole.
 
 Events without any dispatch found in controllers, listeners or jobs carry a `No dispatcher found` badge. Livewire components, console commands, observers and Filament actions are not scanned, so the event may be dispatched from there - or be dead code.
+
+## View map
+
+The Views scope answers "what does this page render?" and "where is this component used?" without compiling or rendering a single template.
+
+| Node | Where it comes from |
+| ---- | ------------------- |
+| View | Every Blade file of the view paths (published `resources/views/vendor/**` overrides excluded by default), named as Laravel names it. Livewire 4 single-file and multi-file components included. |
+| Blade component | Class components reached from an `<x-…>` tag, plus the classes under `views.blade_component_paths`; their view comes from `render()`. |
+| Filament component | Pages, widgets, fields, entries, columns and actions under `views.filament_paths` declaring their own `$view` (or returning it from `getView()`). |
+| Package view | Views and components of packages used by the application (`<x-filament::badge>`, `filament::…`, `mail::message`), shown as leaves. Views that do not exist are flagged `Missing`. |
+| Dynamic view | `@include($view)`, `<x-dynamic-component :component="…">`, `<livewire:is>`: names only known at runtime. |
+
+Templates are read as text: `@extends`, `@include`, `@includeIf`, `@includeWhen`, `@includeUnless`, `@includeFirst` (every candidate), `@each` (and its empty view), `@component`, `@livewire`, `<x-…>` and `<livewire:…>` are extracted with their line, comments and `@verbatim` blocks ignored. Names are then resolved by the framework itself: the view finder for view names, Blade's component tag compiler for `<x-…>` (aliases, namespaces, anonymous components), Livewire's registry for `<livewire:…>`.
+
+Each view has a kind, inferred from how it is used: `layout`, `page`, `partial`, `component`, `livewire` or `mail`. Templates and Blade class components that nothing references carry a `No reference found` badge.
+
+The owners of views are read, never run: `render()` (or `view()` on Livewire 4), `->layout()` and `#[Layout]` for Livewire (a component without either gets the view named after it under `livewire.view_path`, a full-page component without a layout gets the configured one: `livewire.component_layout` on Livewire 4, `livewire.layout` on Livewire 3), `render()` for Blade components, `$view` for Filament classes, `content()` / `build()` / `toMail()` for mail, `Route::view()` and `Route::livewire()` for routes and `view()` / `View::make()` / `->view()` in controller actions.
+
+A Filament widget embedded with `@livewire(StatsWidget::class)` points to its Filament node when it declares its own view.
+
+In the HTTP scope, views stay leaves: a route shows the page it renders, not the layout and partials behind it. In the Views tree, a template shared by several pages is not unfolded twice at the same depth; its other occurrences are marked as already shown.
+
+### Detection limits
+
+- view names computed at runtime become dynamic nodes;
+- view composers, `@yield` / `@section`, `@push` / `@stack` and slots are not mapped;
+- a `render()` that does not return a literal view leaves its component without a view;
+- package views are leaves unless `views.explore_package_views` is enabled.
 
 ## Configuration
 
@@ -260,6 +294,19 @@ return [
         'form_request_rules' => false,
     ],
 
+    // View map: Blade templates, components and what renders them.
+    'views' => [
+        'enabled' => true,                // also shows or hides the Views scope
+        'include_vendor_overrides' => false, // resources/views/vendor/**
+        'explore_package_views' => false, // read package views instead of keeping them as leaves
+        'blade_component_paths' => [app_path('View/Components')],
+        'filament_paths' => [app_path('Filament')],
+        'mail_paths' => [app_path('Mail'), app_path('Notifications')],
+        'exclude' => [
+            'views' => [],                // Str::is() patterns, e.g. 'errors.*'
+        ],
+    ],
+
     // Discovery behavior.
     'discovery' => [
         'relations' => true,
@@ -309,6 +356,7 @@ DependencyGraphPlugin::make()
     ->defaultDepth(2)
     ->allowLaravelScope()
     ->allowHttpScope()
+    ->allowViewsScope()
     ->scanVendorModels(false)
     ->scanLivewireComponents()
     ->excludeModels([AuditLog::class])
@@ -373,7 +421,7 @@ From the CLI:
 ```bash
 php artisan filament-dependency-graph:export
     {--format=json : Export format, json or mermaid}
-    {--scope= : Graph scope, filament, laravel or http}
+    {--scope= : Graph scope, filament, laravel, http or views}
     {--panel=* : Only include the given panel ids}
     {--middleware= : HTTP scope only: keep routes using a middleware (auth) or not using it (!auth)}
     {--focus= : Focus on a node id, for example model:app.models.order}
@@ -401,7 +449,7 @@ Discovery relies on reflection and file scanning, so snapshots are cached. The c
 ```bash
 # Warm the cache, for example in a deploy pipeline
 php artisan filament-dependency-graph:cache
-    {--scope= : Discovery scope, filament, laravel or http}
+    {--scope= : Discovery scope, filament, laravel, http or views}
     {--panel=* : Only discover the given panel ids}
     {--no-schema : Skip database schema inspection}
     {--force : Rebuild even when a cached snapshot exists}
@@ -422,7 +470,8 @@ use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 use LaBoiteACode\DependencyGraph\Facades\DependencyGraph;
 
 // Raw discovery snapshot: models, relations, Livewire components, panels,
-// resources, the HTTP map ($snapshot->http) and warnings.
+// resources, the HTTP map ($snapshot->http), the view map ($snapshot->views)
+// and warnings.
 $snapshot = DependencyGraph::discover();
 
 // Full graph with the default query.
@@ -505,6 +554,7 @@ DependencyGraphPlugin::make()
 - **A Livewire-to-model link is missing.** The read-only scanner recognizes model types on component properties and methods, plus explicit static references such as `Order::query()`. Dynamic container resolution and untyped variables cannot be inferred safely.
 - **A route is missing from the HTTP scope.** Only application routes are mapped: check that its controller lives under `http.controller_namespaces`, that it is not excluded by `http.exclude`, or enable `http.include_vendor_routes` for package routes.
 - **A dispatch or a model is missing on a controller.** The scanner reads the action and one level of typed, injected application classes. Move the class under `http.application_namespaces`, type the collaborator, or accept that dynamic calls are out of reach (see [Detection limits](#detection-limits)).
+- **A view or a component is missing from the Views scope.** Only the view paths of the application are read; published vendor overrides need `views.include_vendor_overrides`. A Blade class component outside `views.blade_component_paths` still appears once a template uses its tag. A name built at runtime shows as a dynamic view.
 - **A relation is not detected.** Untyped relation methods are only discovered through docblocks (enabled by default) or heuristic invocation (disabled by default, because it calls the methods). Add a return type to the relation method for the most reliable detection.
 - **A model shows a warning badge.** Discovery is resilient: the inspector's diagnostics section lists exactly what failed for that class.
 

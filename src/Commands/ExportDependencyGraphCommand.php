@@ -17,7 +17,7 @@ final class ExportDependencyGraphCommand extends Command
 {
     protected $signature = 'filament-dependency-graph:export
         {--format=json : Export format, json or mermaid}
-        {--scope= : Graph scope, filament, laravel or http}
+        {--scope= : Graph scope, filament, laravel, http or views}
         {--panel=* : Only include the given panel ids}
         {--middleware= : HTTP scope only: keep routes using a middleware (auth) or not using it (!auth)}
         {--focus= : Focus on a node id, for example model:app.models.order}

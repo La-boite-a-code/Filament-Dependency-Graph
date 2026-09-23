@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use LaBoiteACode\DependencyGraph\Contracts\DependencyGraphManager;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
 use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
@@ -31,4 +32,36 @@ it('clears the cache through the facade', function (): void {
     DependencyGraph::clearCache();
 
     expect(true)->toBeTrue();
+});
+
+it('reads the snapshot once per request and forgets it when the cache is cleared', function (): void {
+    $manager = app(DependencyGraphManager::class);
+    $first = $manager->discover();
+
+    expect($manager->discover())->toBe($first);
+
+    $manager->clearCache();
+
+    expect($manager->discover())->not->toBe($first);
+});
+
+it('reads the snapshot matching the current configuration', function (): void {
+    $manager = app(DependencyGraphManager::class);
+    $withViews = $manager->discover();
+
+    config()->set('filament-dependency-graph.views.enabled', false);
+
+    expect($withViews->views->isEmpty())->toBeFalse()
+        ->and($manager->discover()->views->isEmpty())->toBeTrue();
+});
+
+it('scopes the manager to the request and never caches it in the facade', function (): void {
+    $manager = app(DependencyGraphManager::class);
+
+    expect(DependencyGraph::getFacadeRoot())->toBe($manager);
+
+    app()->forgetScopedInstances();
+
+    expect(app(DependencyGraphManager::class))->not->toBe($manager)
+        ->and(DependencyGraph::getFacadeRoot())->toBe(app(DependencyGraphManager::class));
 });

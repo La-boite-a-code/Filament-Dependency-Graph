@@ -9,4 +9,5 @@ enum GraphScope: string
     case Filament = 'filament';
     case Laravel = 'laravel';
     case Http = 'http';
+    case Views = 'views';
 }

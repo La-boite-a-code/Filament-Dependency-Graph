@@ -44,6 +44,9 @@
                             @if ($this->isHttpScopeAllowed())
                                 <option value="http">{{ __('filament-dependency-graph::graph.toolbar.scope_http') }}</option>
                             @endif
+                            @if ($this->isViewsScopeAllowed())
+                                <option value="views">{{ __('filament-dependency-graph::graph.toolbar.scope_views') }}</option>
+                            @endif
                         </x-filament::input.select>
                     </x-filament::input.wrapper>
                 </div>
