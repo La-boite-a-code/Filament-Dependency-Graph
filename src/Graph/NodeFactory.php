@@ -205,7 +205,7 @@ final class NodeFactory
             id: NodeId::fromString($controller->id),
             type: NodeType::Controller,
             label: ClassName::shortName($controller->class),
-            subtitle: ClassName::namespace($controller->class),
+            subtitle: null,
             metadata: [
                 'class' => $controller->class,
                 'namespace' => ClassName::namespace($controller->class),
@@ -233,7 +233,7 @@ final class NodeFactory
             id: NodeId::fromString($request->id),
             type: NodeType::FormRequest,
             label: ClassName::shortName($request->class),
-            subtitle: ClassName::namespace($request->class),
+            subtitle: null,
             metadata: [
                 'class' => $request->class,
                 'namespace' => ClassName::namespace($request->class),
@@ -278,7 +278,7 @@ final class NodeFactory
             id: NodeId::fromString($event->id),
             type: NodeType::Event,
             label: ClassName::shortName($event->class),
-            subtitle: ClassName::namespace($event->class),
+            subtitle: null,
             metadata: [
                 'class' => $event->class,
                 'namespace' => ClassName::namespace($event->class),

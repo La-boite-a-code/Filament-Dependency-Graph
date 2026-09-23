@@ -5,13 +5,16 @@ import fcose from 'cytoscape-fcose'
 cytoscape.use(dagre)
 cytoscape.use(fcose)
 
+const fontFamily = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+const monospaceFontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+
 const labelMetrics = (() => {
     const context = document.createElement('canvas').getContext('2d')
-    const fontFamily = 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 
     return (node) => {
         const label = String(node.data('label') ?? '')
-        context.font = `${node.data('type') === 'panel' ? '600 ' : ''}12px ${fontFamily}`
+        const type = node.data('type')
+        context.font = `${type === 'panel' ? '600 ' : ''}12px ${type === 'route' ? monospaceFontFamily : fontFamily}`
 
         return Math.max(...label.split('\n').map((line) => context.measureText(line).width), 24)
     }
@@ -21,7 +24,8 @@ const labelMetrics = (() => {
 // deprecated label sizing needs the renderer to have measured every label,
 // which silently fails while the lazily mounted container has no dimensions
 // and leaves nodes invisible.
-const nodeWidth = (node) => Math.min(Math.ceil(labelMetrics(node)) + 14, 200)
+// Route tags lose their pointed end to the label, hence the extra room.
+const nodeWidth = (node) => Math.min(Math.ceil(labelMetrics(node)) + (node.data('type') === 'route' ? 30 : 14), 240)
 
 // Normalizes any CSS color to rgb() by painting one pixel and reading it
 // back: Filament ships its theme scales as oklch(), which browsers pass
@@ -146,6 +150,20 @@ export default function dependencyGraph({ graph, selected, layout }) {
                       modelBorder: themeColor('--gray-500', '#6b7280'),
                       polymorphic: themeColor('--info-950', '#4a044e'),
                       polymorphicBorder: themeColor('--info-500', '#d946ef'),
+                      route: themeColor('--primary-950', '#1e1b4b'),
+                      routeBorder: themeColor('--primary-400', '#818cf8'),
+                      controller: themeColor('--info-950', '#172554'),
+                      controllerBorder: themeColor('--info-400', '#60a5fa'),
+                      request: themeColor('--warning-950', '#451a03'),
+                      requestBorder: themeColor('--warning-500', '#f59e0b'),
+                      policy: themeColor('--danger-950', '#450a0a'),
+                      policyBorder: themeColor('--danger-500', '#ef4444'),
+                      event: themeColor('--warning-950', '#451a03'),
+                      eventBorder: themeColor('--warning-400', '#fbbf24'),
+                      listener: themeColor('--gray-800', '#1f2937'),
+                      listenerBorder: themeColor('--gray-400', '#9ca3af'),
+                      dispatchable: themeColor('--success-950', '#052e16'),
+                      dispatchableBorder: themeColor('--success-500', '#22c55e'),
                       selection: themeColor('--warning-500', '#f59e0b'),
                   }
                 : {
@@ -165,6 +183,20 @@ export default function dependencyGraph({ graph, selected, layout }) {
                       modelBorder: themeColor('--gray-400', '#9ca3af'),
                       polymorphic: themeColor('--info-100', '#fae8ff'),
                       polymorphicBorder: themeColor('--info-600', '#c026d3'),
+                      route: themeColor('--primary-50', '#eef2ff'),
+                      routeBorder: themeColor('--primary-600', '#4f46e5'),
+                      controller: themeColor('--info-50', '#eff6ff'),
+                      controllerBorder: themeColor('--info-600', '#2563eb'),
+                      request: themeColor('--warning-50', '#fffbeb'),
+                      requestBorder: themeColor('--warning-600', '#d97706'),
+                      policy: themeColor('--danger-50', '#fef2f2'),
+                      policyBorder: themeColor('--danger-600', '#dc2626'),
+                      event: themeColor('--warning-100', '#fef3c7'),
+                      eventBorder: themeColor('--warning-500', '#f59e0b'),
+                      listener: themeColor('--gray-50', '#f9fafb'),
+                      listenerBorder: themeColor('--gray-500', '#6b7280'),
+                      dispatchable: themeColor('--success-50', '#f0fdf4'),
+                      dispatchableBorder: themeColor('--success-600', '#16a34a'),
                       selection: themeColor('--warning-600', '#d97706'),
                   }
         },
@@ -179,7 +211,7 @@ export default function dependencyGraph({ graph, selected, layout }) {
                         label: 'data(label)',
                         'text-valign': 'center',
                         'text-halign': 'center',
-                        'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        'font-family': fontFamily,
                         'font-size': '12px',
                         'font-weight': 500,
                         'min-zoomed-font-size': 6,
@@ -235,6 +267,71 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     },
                 },
                 {
+                    selector: 'node[type = "route"]',
+                    style: {
+                        shape: 'round-tag',
+                        padding: '14px',
+                        'font-family': monospaceFontFamily,
+                        'text-max-width': '220px',
+                        'background-color': colors.route,
+                        'border-color': colors.routeBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "controller"]',
+                    style: {
+                        shape: 'cut-rectangle',
+                        padding: '16px',
+                        'background-color': colors.controller,
+                        'border-color': colors.controllerBorder,
+                        'border-width': 2,
+                    },
+                },
+                {
+                    selector: 'node[type = "form_request"]',
+                    style: {
+                        shape: 'bottom-round-rectangle',
+                        'background-color': colors.request,
+                        'border-color': colors.requestBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "policy"]',
+                    style: {
+                        shape: 'round-octagon',
+                        padding: '16px',
+                        'background-color': colors.policy,
+                        'border-color': colors.policyBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "event"]',
+                    style: {
+                        shape: 'rhomboid',
+                        padding: '18px',
+                        'background-color': colors.event,
+                        'border-color': colors.eventBorder,
+                    },
+                },
+                {
+                    selector: 'node[type = "listener"]',
+                    style: {
+                        shape: 'round-rectangle',
+                        'background-color': colors.listener,
+                        'border-color': colors.listenerBorder,
+                        'border-style': 'dashed',
+                    },
+                },
+                {
+                    selector: 'node[type = "job"], node[type = "mailable"], node[type = "notification"]',
+                    style: {
+                        shape: 'round-hexagon',
+                        padding: '16px',
+                        'background-color': colors.dispatchable,
+                        'border-color': colors.dispatchableBorder,
+                    },
+                },
+                {
                     selector: 'edge',
                     style: {
                         width: 1.75,
@@ -254,10 +351,18 @@ export default function dependencyGraph({ graph, selected, layout }) {
                     },
                 },
                 {
-                    selector: 'edge[type = "model_relation"]',
+                    selector: 'edge[type = "dispatches"]',
+                    style: {
+                        'line-color': colors.dispatchableBorder,
+                        'target-arrow-color': colors.dispatchableBorder,
+                        'target-arrow-shape': 'triangle-backcurve',
+                    },
+                },
+                {
+                    selector: 'edge[type = "model_relation"], edge[type = "route_handled_by_controller"], edge[type = "dispatches"]',
                     style: {
                         label: 'data(label)',
-                        'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                        'font-family': fontFamily,
                         'font-size': '10px',
                         'font-weight': 500,
                         // Hide edge labels while zoomed out: at overview scale
