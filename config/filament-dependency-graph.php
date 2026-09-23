@@ -67,7 +67,8 @@ return [
     |
     | The Filament scope starts from the resources registered in the selected
     | panels. The Laravel scope shows every discovered Eloquent model, even
-    | when no Filament resource exposes it.
+    | when no Filament resource exposes it. The HTTP scope starts from the
+    | application routes; it is controlled by the "http.enabled" option.
     |
     */
 
@@ -123,6 +124,45 @@ return [
             'App\\Livewire\\',
             'App\\Http\\Livewire\\',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP map
+    |--------------------------------------------------------------------------
+    |
+    | Routes, controllers, form requests, route-bound models, policies,
+    | events, listeners, and the jobs, mailables and notifications they
+    | dispatch. Controller actions are never called: everything comes from
+    | the router, reflection and a static reading of the source code.
+    |
+    | Only application routes are mapped: controllers under the controller
+    | namespaces, closures and view routes defined outside vendor/, and
+    | full-page Livewire components. Exclusions accept Str::is() patterns.
+    |
+    | Form request rules are only read when "form_request_rules" is enabled,
+    | because rules() may depend on the current request or the database.
+    |
+    */
+
+    'http' => [
+        'enabled' => true,
+        'controller_namespaces' => [
+            'App\\Http\\Controllers\\',
+        ],
+        // Listeners, jobs, events and injected classes followed one level.
+        'application_namespaces' => [
+            'App\\',
+        ],
+        'include_vendor_routes' => false,
+        'exclude' => [
+            // Route names, for example 'horizon.*'.
+            'names' => [],
+            // Route URIs, for example '_debugbar/*'.
+            'uris' => [],
+        ],
+        'follow_injected_classes' => true,
+        'form_request_rules' => false,
     ],
 
     /*

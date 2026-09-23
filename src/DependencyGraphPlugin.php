@@ -53,6 +53,8 @@ class DependencyGraphPlugin implements Plugin
 
     protected ?bool $laravelScopeAllowed = null;
 
+    protected ?bool $httpScopeAllowed = null;
+
     protected ?bool $vendorModelsScanned = null;
 
     protected ?bool $livewireComponentsScanned = null;
@@ -305,6 +307,17 @@ class DependencyGraphPlugin implements Plugin
         return $this;
     }
 
+    /**
+     * Turns the HTTP map on or off: when disabled, routes are not discovered
+     * and the HTTP scope is not offered.
+     */
+    public function allowHttpScope(bool $condition = true): static
+    {
+        $this->httpScopeAllowed = $condition;
+
+        return $this;
+    }
+
     public function scanVendorModels(bool $condition = true): static
     {
         $this->vendorModelsScanned = $condition;
@@ -461,6 +474,10 @@ class DependencyGraphPlugin implements Plugin
 
         if ($this->laravelScopeAllowed !== null) {
             $config->set('filament-dependency-graph.laravel_scope_enabled', $this->laravelScopeAllowed);
+        }
+
+        if ($this->httpScopeAllowed !== null) {
+            $config->set('filament-dependency-graph.http.enabled', $this->httpScopeAllowed);
         }
 
         if ($this->vendorModelsScanned !== null) {
