@@ -111,3 +111,11 @@ Every option feeds `DiscoveryContext`, hence the cache fingerprint.
 - Fixtures under `tests/Fixtures/views`, unit tests for the scanner, resolver and Livewire adapter, feature tests for owners, scopes, bridge, non-regression, no instantiation and the page; a Livewire 4 single-file test skipped under Livewire 3.
 - ADR 0011, README section with detection limits, CHANGELOG under 1.2.0.
 - Released with the HTTP map as v1.2.0.
+
+## Amendments made during implementation
+
+1. **Kind order**: Livewire, then layout (extended, used as a layout, or under a `layouts` directory), then component, mail, page, partial — a layout Blade component under `components/layouts` is a layout.
+2. **Filament owners** only make their view a `page` when they are pages; widgets, fields and other components render partials.
+3. **`getView()`** is read for `view('…')` literals and for plain `return '…';` string literals.
+4. **Mermaid** quotes labels containing characters other than letters, digits, spaces, dots, dashes and underscores (`-->|"@include"|`), with entity codes for quotes and angle brackets.
+5. **HTTP bridge**: the HTTP traversal follows `renders_view` from every kept node (routes, controllers action-aware, Livewire components, mailables, notifications), views remain leaves because view edges are not followed.

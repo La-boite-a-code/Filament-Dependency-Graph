@@ -19,11 +19,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Resolve route middleware from the route definition and the framework controller attributes the way the router does (aliases, nested groups, exclusions), and filter the HTTP scope by middleware from the explorer, `GraphQuery::$middleware` or `--middleware` on `filament-dependency-graph:export`.
 - Add the `http` configuration block and the `allowHttpScope()` plugin method.
 - Style the new node types in the graph from the Filament palette and label controller methods and dispatch kinds in the graph and in Mermaid exports.
+- Add a Views scope mapping the Blade templates of the application: `@extends`, the `@include` family, `@each`, `@component`, `@livewire`, `<x-…>` and `<livewire:…>` references with their line, resolved by the view finder, Blade's component tag compiler and Livewire's registry, without compiling or rendering anything.
+- Map what renders views: Livewire components (`render()`, `->layout()`, `#[Layout]`), Blade class components, Filament pages, widgets and fields with a custom `$view`, mailables and notifications, `Route::view()` routes and controller actions. Livewire 4 single-file and multi-file components are supported.
+- Show package views as leaves, flag missing views and dynamic references, infer each view's kind (layout, page, partial, component, Livewire, mail) and badge templates without a detected reference.
+- Add view inspectors ("Renders" and "Used by"), views, components and package views table datasets, a Views tree grouped by owner, a "Used in views" column for Livewire components, and a one-hop bridge from the HTTP scope to the views routes and actions render.
+- Add the `views` configuration block and the `allowViewsScope()` plugin method.
 
 ### Changed
 
 - Extract the token based source scanner shared by Livewire and HTTP discovery; Livewire discovery output is unchanged.
-- Bump the snapshot schema to `1.3` for the HTTP map section; cached snapshots are rebuilt automatically.
+- Bump the snapshot schema to `1.4` for the HTTP and view map sections; cached snapshots are rebuilt automatically.
+- Quote Mermaid edge labels that contain directives or component tags so they stay readable.
 
 ## [1.1.2] - 2026-09-22
 
