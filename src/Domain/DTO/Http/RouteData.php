@@ -44,7 +44,11 @@ final readonly class RouteData
 
     public function label(): string
     {
-        return implode('|', $this->methods) . ' /' . ltrim($this->uri, '/');
+        $methods = array_diff(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], $this->methods) === []
+            ? 'ANY'
+            : implode('|', $this->methods);
+
+        return $methods . ' /' . ltrim($this->uri, '/');
     }
 
     /**
