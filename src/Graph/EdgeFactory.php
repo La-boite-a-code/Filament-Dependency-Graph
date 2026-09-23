@@ -119,4 +119,29 @@ final class EdgeFactory
             status: $component->status,
         );
     }
+
+    /**
+     * HTTP edges share one shape: at most one edge per type, source and
+     * target, labelled with what the source does with the target.
+     *
+     * @param  array<string, scalar|array<array-key, mixed>|null>  $metadata
+     */
+    public function http(
+        EdgeType $type,
+        string $sourceId,
+        string $targetId,
+        string $label,
+        array $metadata = [],
+        DiscoveryStatus $status = DiscoveryStatus::Complete,
+    ): Edge {
+        return new Edge(
+            id: EdgeId::fromString(StableIdentifier::edge($type, $sourceId, $targetId)),
+            source: NodeId::fromString($sourceId),
+            target: NodeId::fromString($targetId),
+            type: $type,
+            label: $label,
+            metadata: $metadata,
+            status: $status,
+        );
+    }
 }

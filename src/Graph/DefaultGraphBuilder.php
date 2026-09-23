@@ -15,16 +15,21 @@ use LaBoiteACode\DependencyGraph\Domain\Graph\Node;
 /**
  * Builds the dependency graph from an application snapshot following the
  * documented order: panels, resources, models, structural edges, relation
- * edges, polymorphic placeholders, derived metadata, deterministic sorting.
+ * edges, polymorphic placeholders, the HTTP map, derived metadata,
+ * deterministic sorting.
  */
 final class DefaultGraphBuilder implements GraphBuilder
 {
+    private readonly HttpGraphAssembler $http;
+
     public function __construct(
         private readonly NodeFactory $nodes,
         private readonly EdgeFactory $edges,
         private readonly CycleDetector $cycles,
         private readonly OrphanDetector $orphans,
-    ) {}
+    ) {
+        $this->http = new HttpGraphAssembler($nodes, $edges);
+    }
 
     public function build(ApplicationSnapshot $snapshot): Graph
     {
@@ -114,6 +119,16 @@ final class DefaultGraphBuilder implements GraphBuilder
 
             $edge = $this->edges->modelRelation($relation, $relation->targetModelId);
             $edges[$edge->id->value] = $edge;
+        }
+
+        [$httpNodes, $httpEdges] = $this->http->assemble($snapshot->http);
+
+        foreach ($httpNodes as $node) {
+            $nodes[$node->id->value] ??= $node;
+        }
+
+        foreach ($httpEdges as $edge) {
+            $edges[$edge->id->value] ??= $edge;
         }
 
         $nodes = $this->applyDerivedBadges(

@@ -15,6 +15,7 @@ final readonly class GraphQuery
      * @param  list<string>  $panelIds
      * @param  list<NodeType>  $nodeTypes
      * @param  list<RelationType>  $relationTypes
+     * @param  string|null  $middleware  HTTP scope only: "auth" keeps routes using it, "!auth" routes without it.
      */
     public function __construct(
         public GraphScope $scope = GraphScope::Filament,
@@ -25,6 +26,7 @@ final readonly class GraphQuery
         public ?int $depth = null,
         public TraversalDirection $direction = TraversalDirection::Both,
         public bool $includeOrphans = true,
+        public ?string $middleware = null,
     ) {}
 
     public function hasFocus(): bool
@@ -54,6 +56,7 @@ final readonly class GraphQuery
             'depth' => $this->depth,
             'direction' => $this->direction->value,
             'include_orphans' => $this->includeOrphans,
+            'middleware' => $this->middleware,
         ];
     }
 }
