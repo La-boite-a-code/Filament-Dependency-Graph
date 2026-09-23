@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - Read form request rules on demand with the opt-in `http.form_request_rules` option.
 - Add HTTP inspectors for routes, controllers (action by action), form requests, policies, events, listeners and dispatched classes, plus an HTTP usage section on models and details on HTTP edges.
 - Add routes, events and dispatches table datasets, an action-aware route tree grouped by URI segment with a group for events without a detected dispatcher, and a `No dispatcher found` badge on those events.
-- Resolve route middleware from the route definition and the framework controller attributes, with groups expanded and aliases paired with their classes, and filter the HTTP scope by middleware from the explorer, `GraphQuery::$middleware` or `--middleware` on `filament-dependency-graph:export`.
+- Resolve route middleware from the route definition and the framework controller attributes the way the router does (aliases, nested groups, exclusions), and filter the HTTP scope by middleware from the explorer, `GraphQuery::$middleware` or `--middleware` on `filament-dependency-graph:export`.
 - Add the `http` configuration block and the `allowHttpScope()` plugin method.
 - Style the new node types in the graph from the Filament palette and label controller methods and dispatch kinds in the graph and in Mermaid exports.
 

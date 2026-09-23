@@ -52,7 +52,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
 
         foreach ($this->router->getRoutes()->getRoutes() as $route) {
             if (! $context->includeVendorRoutes && $this->isCachedClosure($route)) {
-                $cachedClosures++;
+                $cachedClosures += $this->isExcluded($route, $context) ? 0 : 1;
 
                 continue;
             }
@@ -78,7 +78,7 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
             $this->warnings[] = new DiscoveryWarning(
                 type: 'route_cache_closures_skipped',
                 message: sprintf(
-                    '%d closure route(s) restored from the route cache were skipped: their file, hence their origin, is unknown. Clear the route cache or enable http.include_vendor_routes to map them.',
+                    '%d closure route(s) restored from the route cache were skipped: their file, hence whether they belong to the application or to the framework (such as the /up health route), is unknown. Clear the route cache or enable http.include_vendor_routes to map them.',
                     $cachedClosures,
                 ),
             );
@@ -147,7 +147,12 @@ final class RouteDiscoverer implements CollectsDiscoveryWarnings
         $methods = $methods === [] ? ['HEAD'] : $methods;
 
         $view = $route->defaults['view'] ?? null;
-        $middleware = $this->middleware->resolve($route, $controllerClass, $controllerMethod);
+        // Full-page Livewire components are invokable controllers too.
+        $middleware = $this->middleware->resolve(
+            $route,
+            $controllerClass ?? $livewireClass,
+            $controllerMethod ?? ($livewireClass === null ? null : '__invoke'),
+        );
 
         return new RouteData(
             id: StableIdentifier::route($methods, $route->getDomain(), $route->uri()),

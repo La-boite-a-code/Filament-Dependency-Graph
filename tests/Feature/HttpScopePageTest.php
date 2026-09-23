@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Route;
 use LaBoiteACode\DependencyGraph\Filament\Pages\DependencyGraphPage;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
@@ -134,3 +135,34 @@ it('expands only the action a route calls in the HTTP tree', function (): void {
         ->and($labels($store))->toContain('StoreOrderRequest', 'OrderPlaced', 'SendOrderConfirmation', 'ShipOrder', 'NotifyWarehouse')
         ->and($labels($store))->not->toContain('UpdateOrderRequest', 'ArchiveOrder', 'Customer');
 });
+
+it('applies the HTTP tree rules to a selected route and labels branches with its action', function (): void {
+    $tree = Livewire::test(DependencyGraphPage::class)
+        ->set('scope', 'http')
+        ->set('selectedNodeId', 'route:GET:/orders/{order}')
+        ->instance()
+        ->getTree();
+
+    $labels = static function (array $item) use (&$labels): array {
+        return [$item['label'], ...collect($item['children'])->flatMap($labels)->all()];
+    };
+
+    $controller = $tree[0]['children'][0];
+
+    expect($labels($tree[0]))->toBe(['GET /orders/{order}', 'OrderController', 'Order', 'OrderPolicy'])
+        ->and($controller['relation'])->toBe('show')
+        ->and($controller['children'][0]['relation'])->toBe('show');
+});
+
+it('offers middleware known only by its class name', function (): void {
+    Route::middleware(EnsureSubscribedProbe::class)->get('premium', [OrderController::class, 'index']);
+
+    $options = Livewire::test(DependencyGraphPage::class)
+        ->set('scope', 'http')
+        ->instance()
+        ->getMiddlewareOptions();
+
+    expect($options)->toContain(EnsureSubscribedProbe::class, 'auth', 'web');
+});
+
+final class EnsureSubscribedProbe {}

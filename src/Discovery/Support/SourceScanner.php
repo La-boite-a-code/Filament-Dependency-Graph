@@ -104,12 +104,23 @@ final class SourceScanner
 
         $body = $this->methodBody(
             $file->tokens,
-            $method->getName(),
+            $this->declaredName($method),
             (int) $method->getStartLine(),
             (int) $method->getEndLine(),
         );
 
         return $body === null ? null : new MethodSource($this, $file, $body);
+    }
+
+    /**
+     * A method imported from a trait under an alias is declared in the trait
+     * under its original name.
+     */
+    private function declaredName(ReflectionMethod $method): string
+    {
+        $alias = $method->getDeclaringClass()->getTraitAliases()[$method->getName()] ?? null;
+
+        return is_string($alias) && str_contains($alias, '::') ? explode('::', $alias, 2)[1] : $method->getName();
     }
 
     /**
@@ -246,7 +257,8 @@ final class SourceScanner
                 continue;
             }
 
-            if (! $token->is(T_USE)) {
+            // "use (" belongs to a closure written at namespace level.
+            if (! $token->is(T_USE) || ($tokens[$index + 1] ?? null)?->is('(')) {
                 continue;
             }
 
@@ -300,10 +312,8 @@ final class SourceScanner
     }
 
     /**
-     * Tokens between the braces of the method declared between the given
-     * lines. The name is matched first; a method imported from a trait
-     * under an alias is declared under its original name, so the first
-     * function of the line range is used as a fallback.
+     * Tokens between the braces of the named method declared between the
+     * given lines.
      *
      * @param  list<PhpToken>  $tokens
      * @return list<PhpToken>|null
@@ -311,7 +321,6 @@ final class SourceScanner
     private function methodBody(array $tokens, string $method, int $startLine, int $endLine): ?array
     {
         $count = count($tokens);
-        $fallback = null;
         $start = null;
 
         for ($index = 0; $index < $count; $index++) {
@@ -333,8 +342,6 @@ final class SourceScanner
                 continue;
             }
 
-            $fallback ??= $index;
-
             if (strcasecmp($name->text, $method) === 0) {
                 $start = $index;
 
@@ -342,13 +349,11 @@ final class SourceScanner
             }
         }
 
-        $index = $start ?? $fallback;
-
-        if ($index === null) {
+        if ($start === null) {
             return null;
         }
 
-        for ($cursor = $index + 1; $cursor < $count; $cursor++) {
+        for ($cursor = $start + 1; $cursor < $count; $cursor++) {
             if ($tokens[$cursor]->is(';')) {
                 return null;
             }

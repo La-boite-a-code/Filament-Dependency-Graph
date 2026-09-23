@@ -575,11 +575,16 @@ class DependencyGraphPage extends Page implements HasTable
 
         $maxDepth = $this->depth ?? (int) $this->configRepository()->get('filament-dependency-graph.graph.default_depth', 2);
         $maxDepth = max($maxDepth, 1);
+        $http = $this->currentScope() === GraphScope::Http;
 
-        if ($this->currentScope() === GraphScope::Http && ($this->selectedNodeId === null || ! $graph->hasNode($this->selectedNodeId))) {
+        if ($http) {
             // A route leads through its controller to models, dispatches and
             // listeners: four levels are needed to read the whole chain.
-            return $this->httpTree($graph, max($maxDepth, 4));
+            $maxDepth = max($maxDepth, 4);
+        }
+
+        if ($http && ($this->selectedNodeId === null || ! $graph->hasNode($this->selectedNodeId))) {
+            return $this->httpTree($graph, $maxDepth);
         }
 
         $roots = [];
@@ -614,7 +619,10 @@ class DependencyGraphPage extends Page implements HasTable
 
         foreach ($roots as $rootId) {
             $visited = [];
-            $tree[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited);
+            $root = $graph->node($rootId);
+            $follow = $http && $root !== null ? $this->httpTreeFilter($graph, $root) : null;
+
+            $tree[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited, $follow);
         }
 
         return array_values(array_filter($tree));
@@ -1294,15 +1302,20 @@ class DependencyGraphPage extends Page implements HasTable
         $names = [];
 
         foreach ($graph->nodesOfType(NodeType::Route) as $route) {
-            $middleware = $route->metadata['resolved_middleware'] ?? $route->metadata['middleware'] ?? [];
+            // What the developer wrote, even a class name...
+            foreach ($this->stringMap($route->metadata['middleware'] ?? []) as $name) {
+                $names[explode(':', $name, 2)[0]] = true;
+            }
 
-            foreach (is_array($middleware) ? $middleware : [] as $name) {
-                // Aliases and group names only: class names are too long to
-                // read in a select, and every class has its alias listed too.
-                if (is_string($name) && $name !== 'Closure' && ! str_contains($name, '\\')) {
+            // ...plus the aliases and group names the resolution adds, but
+            // not the resolved class names, which would only add noise.
+            foreach ($this->stringMap($route->metadata['resolved_middleware'] ?? []) as $name) {
+                if (! str_contains($name, '\\')) {
                     $names[explode(':', $name, 2)[0]] = true;
                 }
             }
+
+            unset($names['Closure']);
         }
 
         $names = array_keys($names);
@@ -1543,7 +1556,7 @@ class DependencyGraphPage extends Page implements HasTable
             }
         }
 
-        return static function (Edge $edge) use ($graph, $action): bool {
+        return static function (Edge $edge) use ($graph, $action): bool|string {
             if ($edge->type === EdgeType::ModelRelation) {
                 return false;
             }
@@ -1554,7 +1567,15 @@ class DependencyGraphPage extends Page implements HasTable
 
             $methods = $edge->metadata['methods'] ?? null;
 
-            return ! is_array($methods) || in_array($action, $methods, true);
+            if (is_array($methods) && ! in_array($action, $methods, true)) {
+                return false;
+            }
+
+            // Requests and models are labelled with every action using
+            // them; under one route, only that route's action matters.
+            return in_array($edge->type, [EdgeType::ControllerValidatesWith, EdgeType::ControllerUsesModel], true)
+                ? $action
+                : true;
         };
     }
 
@@ -1583,7 +1604,7 @@ class DependencyGraphPage extends Page implements HasTable
 
     /**
      * @param  array<string, true>  $visited
-     * @param  (Closure(Edge): bool)|null  $follow  Decides which outgoing edges become branches.
+     * @param  (Closure(Edge): (bool|string))|null  $follow  False skips an edge, a string replaces its branch label.
      * @return array<string, mixed>|null
      */
     protected function treeNode(
@@ -1620,16 +1641,19 @@ class DependencyGraphPage extends Page implements HasTable
         $children = [];
 
         foreach ($graph->outgoingEdges($nodeId) as $edge) {
-            if ($follow !== null && ! $follow($edge)) {
+            $decision = $follow === null ? true : $follow($edge);
+
+            if ($decision === false) {
                 continue;
             }
 
+            $relation = is_string($decision) ? $decision : $edge->label;
             $childLabel = $graph->node($edge->target)->label ?? '';
 
             $children[] = [
-                'sort' => [$edge->label, $childLabel, $edge->type->value],
+                'sort' => [$relation, $childLabel, $edge->type->value],
                 'target' => $edge->target->value,
-                'relation' => $edge->label,
+                'relation' => $relation,
             ];
         }
 

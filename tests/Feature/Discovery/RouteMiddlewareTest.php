@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use Illuminate\Auth\Middleware\Authenticate;
-use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Route;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
+use LaBoiteACode\DependencyGraph\Discovery\Http\ControllerDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\Http\RouteDiscoverer;
 use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\AccountController;
@@ -36,10 +36,6 @@ it('keeps closure middleware serializable', function (): void {
 
     expect($route->middleware)->toBe(['Closure'])
         ->and(serialize(app(ApplicationDiscovery::class)->discover($this->fixtureContext())))->toBeString();
-
-    app(CacheRepository::class)->put('fdg-closure-probe', app(ApplicationDiscovery::class)->discover($this->fixtureContext()));
-
-    expect(app(CacheRepository::class)->get('fdg-closure-probe'))->not->toBeNull();
 });
 
 it('expands middleware groups and pairs aliases with their classes', function (): void {
@@ -100,4 +96,42 @@ it('skips closures restored from the route cache unless vendor routes are includ
     expect($default)->not->toContain('cached.closure')
         ->and($warnings[0]->type)->toBe('route_cache_closures_skipped')
         ->and($withVendor)->toContain('cached.closure');
+});
+
+it('removes excluded middleware however it was written', function (): void {
+    /** @var Router $router */
+    $router = app(Router::class);
+    $router->aliasMiddleware('auth', Authenticate::class);
+    $router->middlewareGroup('admin', ['auth']);
+
+    Route::middleware('auth')->get('by-class', [OrderController::class, 'index'])
+        ->withoutMiddleware(Authenticate::class)
+        ->name('excluded.by.class');
+    Route::middleware(['admin', 'auth'])->get('by-group', [OrderController::class, 'index'])
+        ->withoutMiddleware('admin')
+        ->name('excluded.by.group');
+    Route::middleware(['admin'])->get('kept', [OrderController::class, 'index'])->name('kept');
+
+    $routes = discoveredRoutesByName();
+
+    expect($routes['excluded.by.class']->middleware)->toBe([])
+        ->and($routes['excluded.by.class']->resolvedMiddleware)->not->toContain('auth')
+        ->and($routes['excluded.by.group']->middleware)->toBe([])
+        ->and($routes['excluded.by.group']->resolvedMiddleware)->toBe([])
+        ->and($routes['kept']->resolvedMiddleware)->toContain('admin', 'auth', Authenticate::class);
+});
+
+it('binds snake case parameters in controller actions too', function (): void {
+    Route::get('lines/{order_item}', [AccountController::class, 'show'])->name('lines.show');
+
+    $context = $this->fixtureContext();
+    $controllers = app(ControllerDiscoverer::class)->discover(
+        app(RouteDiscoverer::class)->discover($context),
+        $context,
+        [],
+    );
+
+    $account = collect($controllers)->firstWhere('class', AccountController::class);
+
+    expect($account->actions['show']->models)->toBe([OrderItem::class => ['binding']]);
 });

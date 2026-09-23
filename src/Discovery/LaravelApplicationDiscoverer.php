@@ -27,6 +27,7 @@ use LaBoiteACode\DependencyGraph\Domain\DTO\ResourceData;
 use LaBoiteACode\DependencyGraph\Domain\Enums\RelationType;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryContext;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\DiscoveryWarning;
+use LaBoiteACode\DependencyGraph\Support\NamespaceMatcher;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use Throwable;
 
@@ -163,7 +164,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
      * Application models referenced by routes and controllers take part in
      * the graph even when they live outside the configured model paths.
      * Vendor models (DatabaseNotification, ...) follow the vendor_models
-     * option, like every other model.
+     * option and its namespace allowlist, like scanned models.
      *
      * @param  array<string, ModelData>  $models
      * @param  list<string>  $classes
@@ -178,7 +179,12 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
 
             $model = $this->discoverSingleClass($class, $context);
 
-            if ($model !== null && ($model->applicationOwned || $context->vendorModelsEnabled)) {
+            $allowed = $model !== null && (
+                $model->applicationOwned
+                || ($context->vendorModelsEnabled && NamespaceMatcher::matchesNamespace($model->class, $context->vendorModelNamespaces))
+            );
+
+            if ($allowed) {
                 $models[$model->id] = $model;
             }
         }

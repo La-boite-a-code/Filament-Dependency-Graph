@@ -250,11 +250,13 @@ final class NodeFactory
     }
 
     /**
-     * @param  list<string>  $modelClasses  Every model the policy guards; defaults to the policy's own model.
+     * @param  list<PolicyData>  $guards  Every model/policy pair of this policy; defaults to the given one.
      */
-    public function forPolicy(PolicyData $policy, array $modelClasses = []): Node
+    public function forPolicy(PolicyData $policy, array $guards = []): Node
     {
-        $modelClasses = $modelClasses === [] ? [$policy->modelClass] : $modelClasses;
+        $guards = $guards === [] ? [$policy] : $guards;
+        $modelClasses = array_map(static fn (PolicyData $guard): string => $guard->modelClass, $guards);
+        $sources = array_values(array_unique(array_map(static fn (PolicyData $guard): string => $guard->source, $guards)));
 
         return new Node(
             id: NodeId::fromString($policy->id),
@@ -267,10 +269,10 @@ final class NodeFactory
                 'file' => $policy->file,
                 'model_classes' => $modelClasses,
                 'abilities' => $policy->abilities,
-                'source' => $policy->source,
+                'sources' => $sources,
                 'warnings' => $policy->warnings,
             ],
-            badges: [ucfirst($policy->source)],
+            badges: array_map('ucfirst', $sources),
             status: $policy->status,
         );
     }

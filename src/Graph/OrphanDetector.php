@@ -15,10 +15,13 @@ use LaBoiteACode\DependencyGraph\Domain\Graph\Graph;
 final class OrphanDetector
 {
     /**
+     * @param  list<EdgeType>  $usageEdges  Edges that count as a use of their target model.
      * @return list<string> Sorted orphan model node ids.
      */
-    public function detect(Graph $graph): array
-    {
+    public function detect(
+        Graph $graph,
+        array $usageEdges = [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel],
+    ): array {
         $connected = [];
 
         foreach ($graph->edges as $edge) {
@@ -27,7 +30,7 @@ final class OrphanDetector
                 $connected[$edge->target->value] = true;
             }
 
-            if (in_array($edge->type, [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel], true)) {
+            if (in_array($edge->type, $usageEdges, true)) {
                 $connected[$edge->target->value] = true;
             }
         }

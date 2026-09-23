@@ -89,16 +89,16 @@ final class HttpGraphAssembler
             $nodes[] = $this->nodes->forFormRequest($request);
         }
 
-        $policyModels = [];
+        $guards = [];
 
         foreach ($http->policies as $policy) {
-            $policyModels[$policy->id][] = $policy->modelClass;
+            $guards[$policy->id][] = $policy;
         }
 
         foreach ($http->policies as $policy) {
-            if (isset($policyModels[$policy->id])) {
-                $nodes[] = $this->nodes->forPolicy($policy, $policyModels[$policy->id]);
-                unset($policyModels[$policy->id]);
+            if (isset($guards[$policy->id])) {
+                $nodes[] = $this->nodes->forPolicy($policy, $guards[$policy->id]);
+                unset($guards[$policy->id]);
             }
 
             $edges[] = $this->edges->http(

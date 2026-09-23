@@ -19,6 +19,7 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 use LaBoiteACode\DependencyGraph\Support\StableIdentifier;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Broken\BrokenListener;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\AuditController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\NotificationController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Controllers\OrderController;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Events\OrderArchived;
@@ -32,9 +33,13 @@ use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Mail\OrderShippedMail;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Notifications\OrderUpdated;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Policies\CatalogPolicy;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Http\Requests\StoreOrderRequest;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\AuditEntry;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Customer;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Order;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Models\Product;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Policies\Attributed\Contract;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Policies\Attributed\Document;
+use LaBoiteACode\DependencyGraph\Tests\Fixtures\Policies\Attributed\DocumentPolicy;
 use LaBoiteACode\DependencyGraph\Tests\Fixtures\Policies\OrderPolicy;
 
 function httpFixtureSnapshot(mixed ...$overrides): ApplicationSnapshot
@@ -167,14 +172,28 @@ it('never instantiates controllers, policies or form requests', function (): voi
         ->and(StoreOrderRequest::$instances)->toBe(1);
 });
 
-it('leaves the Filament and Laravel scopes untouched', function (GraphScope $scope): void {
+it('leaves the Filament and Laravel scopes untouched', function (GraphScope $scope, bool $includeOrphans): void {
+    // A model used only by a controller must keep its orphan status there.
+    Route::get('audits', [AuditController::class, 'index'])->name('audits');
+
     $build = static fn (bool $http): array => app(BuildDependencyGraph::class)->execute(
         httpFixtureSnapshot(discoverHttp: $http),
-        new GraphQuery(scope: $scope),
+        new GraphQuery(scope: $scope, includeOrphans: $includeOrphans),
     )->toArray();
 
     expect($build(true))->toBe($build(false));
-})->with([GraphScope::Filament, GraphScope::Laravel]);
+})->with([GraphScope::Filament, GraphScope::Laravel])->with([true, false]);
+
+it('keeps models used by controllers when orphans are hidden in the HTTP scope', function (): void {
+    Route::get('audits', [AuditController::class, 'index'])->name('audits');
+
+    $graph = app(BuildDependencyGraph::class)->execute(
+        httpFixtureSnapshot(),
+        new GraphQuery(scope: GraphScope::Http, includeOrphans: false),
+    );
+
+    expect($graph->hasNode(StableIdentifier::model(AuditEntry::class)))->toBeTrue();
+});
 
 it('only adds vendor models referenced by controllers when vendor models are enabled', function (): void {
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications');
@@ -185,7 +204,11 @@ it('only adds vendor models referenced by controllers when vendor models are ena
     );
 
     expect($classes(httpFixtureSnapshot()))->not->toContain(DatabaseNotification::class)
-        ->and($classes(httpFixtureSnapshot(vendorModelsEnabled: true)))->toContain(DatabaseNotification::class);
+        ->and($classes(httpFixtureSnapshot(vendorModelsEnabled: true)))->not->toContain(DatabaseNotification::class)
+        ->and($classes(httpFixtureSnapshot(
+            vendorModelsEnabled: true,
+            vendorModelNamespaces: ['Illuminate\\Notifications\\'],
+        )))->toContain(DatabaseNotification::class);
 });
 
 it('shows one node for a policy guarding several models', function (): void {
@@ -195,6 +218,7 @@ it('shows one node for a policy guarding several models', function (): void {
     $policy = $graph->node(StableIdentifier::policy(CatalogPolicy::class));
 
     expect($policy->metadata['model_classes'])->toBe([Customer::class, Product::class])
+        ->and($policy->metadata['sources'])->toBe(['registered'])
         ->and($policy->subtitle)->toBe('Customer, Product')
         ->and(count($graph->incomingEdges($policy->id)))->toBe(2);
 });
@@ -208,4 +232,18 @@ it('isolates classes that cannot be loaded', function (): void {
     expect($snapshot->http->routes)->not->toBe([])
         ->and($snapshot->http->listeners)->not->toBe([])
         ->and(collect($snapshot->warnings)->pluck('type'))->toContain('policy_not_resolvable');
+});
+
+it('resolves policies declared with the UsePolicy attribute, on the model or a parent', function (): void {
+    if (! class_exists('Illuminate\Database\Eloquent\Attributes\UsePolicy')) {
+        $this->markTestSkipped('The UsePolicy attribute is not available in this Laravel version.');
+    }
+
+    $policies = app(PolicyDiscoverer::class)->discover([Document::class, Contract::class], $this->fixtureContext());
+
+    expect(array_map(static fn (PolicyData $policy): array => [$policy->modelClass, $policy->class, $policy->source], $policies))
+        ->toEqualCanonicalizing([
+            [Document::class, DocumentPolicy::class, PolicyData::SOURCE_ATTRIBUTE],
+            [Contract::class, DocumentPolicy::class, PolicyData::SOURCE_ATTRIBUTE],
+        ]);
 });

@@ -51,7 +51,7 @@ final class BuildDependencyGraph
         $graph = $this->filterNodeTypes($graph, $query);
 
         if (! $query->includeOrphans) {
-            $graph = $this->withoutOrphans($graph);
+            $graph = $this->withoutOrphans($graph, $query->scope);
         }
 
         if ($query->hasFocus() && $query->focusNodeId !== null && $graph->hasNode($query->focusNodeId)) {
@@ -331,9 +331,19 @@ final class BuildDependencyGraph
         return $graph->subgraph($nodeIds);
     }
 
-    private function withoutOrphans(Graph $graph): Graph
+    /**
+     * In the HTTP scope a model used by a controller is connected: hiding
+     * orphans must not hide what the routes lead to.
+     */
+    private function withoutOrphans(Graph $graph, GraphScope $scope): Graph
     {
-        $orphans = array_flip($this->orphans->detect($graph));
+        $usageEdges = [EdgeType::ResourceUsesModel, EdgeType::LivewireUsesModel];
+
+        if ($scope === GraphScope::Http) {
+            $usageEdges[] = EdgeType::ControllerUsesModel;
+        }
+
+        $orphans = array_flip($this->orphans->detect($graph, $usageEdges));
 
         $nodeIds = [];
 

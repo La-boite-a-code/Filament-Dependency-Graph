@@ -159,7 +159,7 @@ The HTTP scope answers "what happens when this URL is called?" without running a
 
 Calls on injected application classes are followed **one level deep**: when `store()` calls `$placeOrder->execute()` on a typed parameter or `$this->orders->archive()` on a promoted property, the called method is read as well and its dispatches are attributed to the controller with a `via` note. Every dispatch keeps its `file:line` location in the inspector.
 
-Route middleware combines the route definition with the framework's controller attributes (`#[Middleware]`, `#[Authorize]`, `#[WithoutMiddleware]` on Laravel 13). Groups are expanded recursively and aliases are paired with their classes, so the explorer's **middleware filter** is reliable: "Routes using auth" keeps the routes whose middleware includes `auth` (directly, with parameters such as `auth:sanctum`, through a group or as its class) and what they reach, "Routes without auth" the others. The traversal is action-aware: a controller reached from `index` does not drag in what `store` dispatches; the tree view follows the same rule.
+Route middleware combines the route definition with the framework's controller attributes (`#[Middleware]`, `#[Authorize]`, `#[WithoutMiddleware]` on Laravel 13, including on full-page Livewire components). The router then resolves it exactly as it would for a request - aliases, nested groups, and exclusions however they are written - and every alias or group name leading to an effective middleware is kept, so the explorer's **middleware filter** is reliable: "Routes using auth" keeps the routes whose middleware includes `auth` (directly, with parameters such as `auth:sanctum`, through a group or as its class) and what they reach, "Routes without auth" the others. The traversal is action-aware: a controller reached from `index` does not drag in what `store` dispatches; the tree view follows the same rule.
 
 ### Detection limits
 
@@ -168,8 +168,9 @@ Everything above comes from registries, reflection and a token-level reading of 
 - explicit bindings registered with `Route::bind()` or `Route::model()`;
 - classes built dynamically (`new $class`, `app($name)`, `dispatch($job)` on an untyped variable);
 - dispatches more than one collaborator away from the action, listener or job;
-- middleware returned by a controller's static `middleware()` method (`HasMiddleware`): only the framework attributes are read;
-- closure routes restored from the route cache: their file is unknown, so they are skipped with a warning unless `http.include_vendor_routes` is enabled.
+- middleware returned by a controller's static `middleware()` method (`HasMiddleware`), and application subclasses of the middleware attributes: only the framework's own attributes are read;
+- closure routes restored from the route cache: their file is unknown, so they are skipped with a warning unless `http.include_vendor_routes` is enabled (the framework's own `/up` health route is one of them);
+- several namespaces declared in one file: imports are read for the file as a whole.
 
 Events without any dispatch found in controllers, listeners or jobs carry a `No dispatcher found` badge. Livewire components, console commands, observers and Filament actions are not scanned, so the event may be dispatched from there - or be dead code.
 

@@ -152,3 +152,38 @@ it('ignores the trailing comma of a grouped import', function (): void {
 
     expect($file->imports)->toBe(['Order' => 'App\Models\Order', 'Item' => 'App\Models\Item']);
 });
+
+it('does not mistake a namespace-level closure for an import', function (): void {
+    $file = (new SourceScanner)->parse(<<<'PHP'
+        <?php
+        namespace App {
+            $handler = function () use ($x) { return $x; };
+            use App\Models\Order;
+        }
+        PHP);
+
+    expect($file->imports)->toBe(['Order' => 'App\Models\Order']);
+});
+
+it('keeps only the most recently read files in memory', function (): void {
+    $scanner = new SourceScanner;
+    $directory = sys_get_temp_dir() . '/fdg-scanner-cache';
+    @mkdir($directory);
+
+    foreach (range(1, 20) as $index) {
+        file_put_contents("{$directory}/file{$index}.php", "<?php class Probe{$index} {}");
+        $scanner->file("{$directory}/file{$index}.php");
+    }
+
+    $files = (new ReflectionProperty(SourceScanner::class, 'files'))->getValue($scanner);
+
+    expect($files)->toHaveCount(16)
+        ->and(array_key_first($files))->toBe("{$directory}/file5.php");
+
+    $scanner->read("{$directory}/file1.php");
+
+    expect((new ReflectionProperty(SourceScanner::class, 'files'))->getValue($scanner))->toHaveCount(16);
+
+    array_map('unlink', glob("{$directory}/*.php") ?: []);
+    @rmdir($directory);
+});

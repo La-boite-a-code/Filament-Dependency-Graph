@@ -187,7 +187,7 @@ final class HttpNodeInspector implements NodeInspector
                 'Class' => $this->string($node, 'class'),
                 'File' => $this->string($node, 'file'),
                 'Models' => $this->stringList($node, 'model_classes'),
-                'Resolved by' => $this->string($node, 'source'),
+                'Resolved by' => $this->stringList($node, 'sources'),
             ]),
             new InspectionSection('abilities', 'Abilities', [
                 'Abilities' => $this->stringList($node, 'abilities'),
