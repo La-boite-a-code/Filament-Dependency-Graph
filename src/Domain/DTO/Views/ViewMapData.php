@@ -23,6 +23,11 @@ final readonly class ViewMapData
         public array $dynamics = [],
     ) {}
 
+    public function isEmpty(): bool
+    {
+        return $this->views === [] && $this->owners === [] && $this->externals === [] && $this->dynamics === [];
+    }
+
     /**
      * @param  array<string, mixed>  $data
      */

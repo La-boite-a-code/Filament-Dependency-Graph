@@ -28,6 +28,17 @@ final readonly class HttpMapData
         public array $dispatchables = [],
     ) {}
 
+    public function isEmpty(): bool
+    {
+        return $this->routes === []
+            && $this->controllers === []
+            && $this->formRequests === []
+            && $this->policies === []
+            && $this->events === []
+            && $this->listeners === []
+            && $this->dispatchables === [];
+    }
+
     /**
      * @param  list<PolicyData>  $policies
      */

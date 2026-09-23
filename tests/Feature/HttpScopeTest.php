@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use LaBoiteACode\DependencyGraph\Application\BuildDependencyGraph;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
+use LaBoiteACode\DependencyGraph\Contracts\GraphBuilder;
 use LaBoiteACode\DependencyGraph\Domain\Enums\EdgeType;
 use LaBoiteACode\DependencyGraph\Domain\Enums\GraphScope;
 use LaBoiteACode\DependencyGraph\Domain\Enums\NodeType;
@@ -149,3 +150,18 @@ it('keeps the HTTP map out of the Filament and Laravel scopes', function (GraphS
         expect($graph->nodesOfType($type))->toBe([]);
     }
 })->with([GraphScope::Filament, GraphScope::Laravel]);
+
+it('builds the Laravel scope exactly as the full graph without its HTTP and view nodes', function (): void {
+    $snapshot = app(ApplicationDiscovery::class)->discover($this->fixtureContext());
+    $full = app(GraphBuilder::class)->build($snapshot);
+    $kept = array_map(
+        static fn (Node $node): string => $node->id->value,
+        array_filter($full->nodes, static fn (Node $node): bool => ! $node->type->isHttp() && ! $node->type->isView()),
+    );
+
+    $laravel = app(BuildDependencyGraph::class)->execute($snapshot, new GraphQuery(scope: GraphScope::Laravel, includeOrphans: true));
+
+    expect($snapshot->http->isEmpty())->toBeFalse()
+        ->and($snapshot->views->isEmpty())->toBeFalse()
+        ->and($laravel->toArray())->toBe($full->subgraph(array_values($kept))->toArray());
+});

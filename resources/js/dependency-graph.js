@@ -576,23 +576,27 @@ export default function dependencyGraph({ graph, selected, layout }) {
         },
 
         select(elementId) {
-            this.cy.elements().removeClass('fdg-selected fdg-faded')
+            // One style pass for the whole update instead of one per class
+            // change: large graphs stay responsive on click.
+            this.cy.batch(() => {
+                this.cy.elements().removeClass('fdg-selected fdg-faded')
 
-            const element = this.cy.getElementById(elementId)
+                const element = this.cy.getElementById(elementId)
 
-            if (element.empty()) {
-                return
-            }
+                if (element.empty()) {
+                    return
+                }
 
-            element.addClass('fdg-selected')
+                element.addClass('fdg-selected')
 
-            // Focus + context: keep the selection and its direct neighborhood
-            // at full opacity and fade everything else.
-            const neighborhood = element.isNode()
-                ? element.closedNeighborhood()
-                : element.connectedNodes().union(element)
+                // Focus + context: keep the selection and its direct
+                // neighborhood at full opacity and fade everything else.
+                const neighborhood = element.isNode()
+                    ? element.closedNeighborhood()
+                    : element.connectedNodes().union(element)
 
-            this.cy.elements().not(neighborhood).addClass('fdg-faded')
+                this.cy.elements().not(neighborhood).addClass('fdg-faded')
+            })
         },
 
         clearSelection() {

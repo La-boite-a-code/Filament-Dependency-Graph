@@ -22,6 +22,13 @@ use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
  */
 final class DependencyGraph extends Facade
 {
+    /**
+     * The manager is scoped to the request: always resolve it again.
+     *
+     * @var bool
+     */
+    protected static $cached = false;
+
     protected static function getFacadeAccessor(): string
     {
         return DependencyGraphManager::class;

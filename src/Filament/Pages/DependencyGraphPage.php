@@ -491,7 +491,7 @@ class DependencyGraphPage extends Page implements HasTable
             $graph = $this->currentGraph();
 
             return [
-                'graph' => $graph->toArray(),
+                'graph' => $this->rendererGraph($graph),
                 'stats' => [
                     'nodes' => $graph->nodeCount(),
                     'edges' => $graph->edgeCount(),
@@ -505,6 +505,34 @@ class DependencyGraphPage extends Page implements HasTable
                 'error' => $exception->getMessage(),
             ];
         }
+    }
+
+    /**
+     * What the renderer draws, without the metadata only the inspector
+     * reads: the payload is embedded in the page on every update.
+     *
+     * @return array{nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>}
+     */
+    protected function rendererGraph(Graph $graph): array
+    {
+        return [
+            'nodes' => array_map(static fn (Node $node): array => [
+                'id' => $node->id->value,
+                'type' => $node->type->value,
+                'label' => $node->label,
+                'subtitle' => $node->subtitle,
+                'badges' => $node->badges,
+                'status' => $node->status->value,
+                'metadata' => ['kind' => $node->metadata['kind'] ?? null],
+            ], $graph->nodes),
+            'edges' => array_map(static fn (Edge $edge): array => [
+                'id' => $edge->id->value,
+                'type' => $edge->type->value,
+                'source' => $edge->source->value,
+                'target' => $edge->target->value,
+                'label' => $edge->label,
+            ], $graph->edges),
+        ];
     }
 
     /**
@@ -1757,6 +1785,9 @@ class DependencyGraphPage extends Page implements HasTable
         ];
 
         $tree = [];
+        // Layouts and partials are shared by many pages: each node is
+        // unfolded once for the whole tree, later occurrences are marked.
+        $visited = [];
 
         foreach ($groups as $group => $types) {
             $owners = [];
@@ -1775,7 +1806,7 @@ class DependencyGraphPage extends Page implements HasTable
 
             if ($owners !== []) {
                 usort($owners, static fn (Node $a, Node $b): int => strcmp($a->label, $b->label));
-                $tree[] = $this->treeGroup('group:' . $group, __('filament-dependency-graph::graph.tree.groups.' . $group), $graph, $owners, $maxDepth, $this->viewsTreeFilter());
+                $tree[] = $this->treeGroup('group:' . $group, __('filament-dependency-graph::graph.tree.groups.' . $group), $graph, $owners, $maxDepth, $this->viewsTreeFilter(), $visited);
             }
         }
 
@@ -1792,6 +1823,7 @@ class DependencyGraphPage extends Page implements HasTable
                 $unreferenced,
                 $maxDepth,
                 $this->viewsTreeFilter(),
+                $visited,
             );
         }
 
@@ -1845,15 +1877,26 @@ class DependencyGraphPage extends Page implements HasTable
     /**
      * @param  list<Node>  $nodes
      * @param  (Closure(Edge): (bool|string))|null  $follow  Defaults to the HTTP rules of each root.
+     * @param  array<string, true>|null  $visited  Shared across roots when given; each root still unfolds.
      * @return array<string, mixed>
      */
-    protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth, ?Closure $follow = null): array
+    protected function treeGroup(string $id, string $label, Graph $graph, array $nodes, int $maxDepth, ?Closure $follow = null, ?array &$visited = null): array
     {
         $children = [];
 
         foreach ($nodes as $node) {
-            $visited = [];
-            $children[] = $this->treeNode($graph, $node->id->value, null, $maxDepth + 1, $visited, $follow ?? $this->httpTreeFilter($graph, $node));
+            $rootId = $node->id->value;
+            $filter = $follow ?? $this->httpTreeFilter($graph, $node);
+
+            if ($visited === null) {
+                $rootVisited = [];
+                $children[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $rootVisited, $filter);
+
+                continue;
+            }
+
+            unset($visited[$rootId]);
+            $children[] = $this->treeNode($graph, $rootId, null, $maxDepth + 1, $visited, $filter);
         }
 
         return [

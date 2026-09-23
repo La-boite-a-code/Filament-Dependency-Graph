@@ -55,6 +55,22 @@ it('groups the Views tree by owner and lists unreferenced views', function (): v
 
     expect($index['label'])->toBe('orders.index')
         ->and(collect($index['children'])->pluck('label')->all())->toContain('layouts.app', 'orders.partials.row', 'Alert');
+
+    // Shared templates are unfolded once for the whole tree.
+    $occurrences = [];
+    $walk = function (array $items) use (&$walk, &$occurrences): void {
+        foreach ($items as $item) {
+            if ($item['id'] === 'view:layouts.app') {
+                $occurrences[] = $item['already_shown'];
+            }
+
+            $walk($item['children']);
+        }
+    };
+    $walk($tree);
+
+    expect(count($occurrences))->toBeGreaterThan(1)
+        ->and(array_filter($occurrences, static fn (bool $shown): bool => ! $shown))->toHaveCount(1);
 });
 
 it('inspects a view with what it renders and who uses it', function (): void {

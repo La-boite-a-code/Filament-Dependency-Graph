@@ -33,7 +33,11 @@ final class BuildDependencyGraph
 
     public function execute(ApplicationSnapshot $snapshot, ?GraphQuery $query = null): Graph
     {
-        $graph = $this->builder->build($snapshot);
+        $graph = $this->builder->build(
+            in_array($query?->scope, [GraphScope::Filament, GraphScope::Laravel], true)
+                ? $this->withoutMaps($snapshot)
+                : $snapshot,
+        );
 
         if ($query === null) {
             return $graph;
@@ -65,6 +69,29 @@ final class BuildDependencyGraph
         }
 
         return $graph;
+    }
+
+    /**
+     * The Filament and Laravel scopes drop every HTTP and view node: they
+     * are not built at all. Model badges only depend on relations,
+     * resources and Livewire components, so they are unchanged.
+     */
+    private function withoutMaps(ApplicationSnapshot $snapshot): ApplicationSnapshot
+    {
+        if ($snapshot->http->isEmpty() && $snapshot->views->isEmpty()) {
+            return $snapshot;
+        }
+
+        return new ApplicationSnapshot(
+            fingerprint: $snapshot->fingerprint,
+            generatedAt: $snapshot->generatedAt,
+            models: $snapshot->models,
+            relations: $snapshot->relations,
+            resources: $snapshot->resources,
+            panels: $snapshot->panels,
+            warnings: $snapshot->warnings,
+            livewireComponents: $snapshot->livewireComponents,
+        );
     }
 
     private function filterRelationTypes(Graph $graph, GraphQuery $query): Graph

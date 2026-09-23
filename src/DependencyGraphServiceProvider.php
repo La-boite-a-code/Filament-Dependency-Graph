@@ -158,7 +158,7 @@ class DependencyGraphServiceProvider extends PackageServiceProvider
         });
 
         $this->app->singleton(NodeInspector::class, DefaultNodeInspector::class);
-        $this->app->singleton(DependencyGraphManager::class, DefaultDependencyGraphManager::class);
+        $this->app->scoped(DependencyGraphManager::class, DefaultDependencyGraphManager::class);
     }
 
     public function packageBooted(): void

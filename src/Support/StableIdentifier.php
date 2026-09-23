@@ -15,6 +15,9 @@ use LaBoiteACode\DependencyGraph\Domain\Enums\EdgeType;
  */
 final class StableIdentifier
 {
+    /** @var array<string, string> */
+    private static array $normalizedClasses = [];
+
     public static function model(string $class): string
     {
         return 'model:' . self::normalizeClass($class);
@@ -142,6 +145,20 @@ final class StableIdentifier
      * "app.filament.resources.order-resource".
      */
     public static function normalizeClass(string $class): string
+    {
+        // Called for every node and edge end: classes repeat a lot.
+        if (isset(self::$normalizedClasses[$class])) {
+            return self::$normalizedClasses[$class];
+        }
+
+        if (count(self::$normalizedClasses) >= 4096) {
+            self::$normalizedClasses = [];
+        }
+
+        return self::$normalizedClasses[$class] = self::normalizeClassName($class);
+    }
+
+    private static function normalizeClassName(string $class): string
     {
         $segments = explode('\\', ClassName::normalize($class));
 

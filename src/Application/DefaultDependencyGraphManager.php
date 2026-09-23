@@ -18,6 +18,14 @@ use LaBoiteACode\DependencyGraph\Domain\ValueObjects\GraphQuery;
 
 final class DefaultDependencyGraphManager implements DependencyGraphManager
 {
+    /**
+     * Snapshot of the default context, read once per request: the page asks
+     * for several graphs and the panel list in the same request. The
+     * manager is bound as a scoped instance, so long-running workers never
+     * keep a stale snapshot.
+     */
+    private ?ApplicationSnapshot $snapshot = null;
+
     public function __construct(
         private readonly DiscoverApplication $discoverApplication,
         private readonly BuildDependencyGraph $buildGraph,
@@ -29,12 +37,16 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
 
     public function discover(?DiscoveryContext $context = null): ApplicationSnapshot
     {
-        return $this->discoverApplication->execute($context);
+        if ($context !== null) {
+            return $this->discoverApplication->execute($context);
+        }
+
+        return $this->snapshot ??= $this->discoverApplication->execute();
     }
 
     public function graph(?GraphQuery $query = null): Graph
     {
-        $snapshot = $this->discoverApplication->execute();
+        $snapshot = $this->discover();
 
         return $this->buildGraph->execute($snapshot, $query ?? $this->defaultQuery());
     }
@@ -46,7 +58,7 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
     ): string {
         $query ??= $this->defaultQuery();
 
-        $snapshot = $this->discoverApplication->execute();
+        $snapshot = $this->discover();
         $graph = $this->buildGraph->execute($snapshot, $query);
 
         return $this->exportGraph->execute(
@@ -58,6 +70,7 @@ final class DefaultDependencyGraphManager implements DependencyGraphManager
 
     public function clearCache(): void
     {
+        $this->snapshot = null;
         $this->clearGraphCache->execute();
     }
 
