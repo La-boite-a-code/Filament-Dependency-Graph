@@ -6,13 +6,19 @@ namespace LaBoiteACode\DependencyGraph\Discovery;
 
 use DateTimeImmutable;
 use LaBoiteACode\DependencyGraph\Contracts\ApplicationDiscovery;
+use LaBoiteACode\DependencyGraph\Contracts\HttpMapDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\LivewireComponentDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ModelDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\PanelDiscoverer;
+use LaBoiteACode\DependencyGraph\Contracts\PolicyDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\RelationDiscoverer;
 use LaBoiteACode\DependencyGraph\Contracts\ResourceDiscoverer;
 use LaBoiteACode\DependencyGraph\Discovery\Support\CollectsDiscoveryWarnings;
+use LaBoiteACode\DependencyGraph\Discovery\Support\SourceScanner;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ApplicationSnapshot;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\HttpMapData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\PolicyData;
+use LaBoiteACode\DependencyGraph\Domain\DTO\Http\RouteData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\LivewireComponentData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\ModelData;
 use LaBoiteACode\DependencyGraph\Domain\DTO\PanelData;
@@ -39,21 +45,38 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         private readonly PanelDiscoverer $panelDiscoverer,
         private readonly ResourceDiscoverer $resourceDiscoverer,
         private readonly LivewireComponentDiscoverer $livewireComponentDiscoverer,
+        private readonly HttpMapDiscoverer $httpMapDiscoverer,
+        private readonly PolicyDiscoverer $policyDiscoverer,
+        private readonly SourceScanner $scanner,
     ) {}
 
     public function discover(DiscoveryContext $context): ApplicationSnapshot
     {
         $this->warnings = [];
 
+        try {
+            return $this->run($context);
+        } finally {
+            // Tokenized sources are only reused within one discovery run.
+            $this->scanner->forget();
+        }
+    }
+
+    private function run(DiscoveryContext $context): ApplicationSnapshot
+    {
         $panels = $this->discoverPanels($context);
         $resources = $this->discoverResources($context);
         $livewireComponents = $this->discoverLivewireComponents($context);
+        $http = $this->discoverHttpMap($context);
         $models = $this->discoverModels($context);
 
         $models = $this->addResourceModels($models, $resources, $context);
         $models = $this->addLivewireComponentModels($models, $livewireComponents, $context);
+        $models = $this->addModelClasses($models, $http->referencedModelClasses(), $context);
 
         [$models, $relations] = $this->discoverRelations($models, $context);
+
+        $http = $http->withPolicies($this->discoverPolicies($models, $context));
 
         $relations = $this->markInverseRelations($relations);
 
@@ -66,7 +89,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             static fn (LivewireComponentData $a, LivewireComponentData $b): int => strcmp($a->id, $b->id),
         );
 
-        $warnings = $this->aggregateWarnings($models, $relations, $resources, $livewireComponents);
+        $warnings = $this->aggregateWarnings($models, $relations, $resources, $livewireComponents, $http);
 
         return new ApplicationSnapshot(
             fingerprint: $this->fingerprint(
@@ -76,6 +99,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
                 $resources,
                 $panels,
                 $livewireComponents,
+                $http,
             ),
             generatedAt: new DateTimeImmutable,
             models: $models,
@@ -84,7 +108,80 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             panels: $panels,
             warnings: $warnings,
             livewireComponents: $livewireComponents,
+            http: $http,
         );
+    }
+
+    private function discoverHttpMap(DiscoveryContext $context): HttpMapData
+    {
+        try {
+            $http = $this->httpMapDiscoverer->discover($context);
+        } catch (Throwable $exception) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'http_discovery_failed',
+                message: sprintf('HTTP map discovery failed: %s', $exception->getMessage()),
+                exceptionClass: $exception::class,
+            );
+
+            $http = new HttpMapData;
+        }
+
+        $this->drainWarnings($this->httpMapDiscoverer);
+
+        return $http;
+    }
+
+    /**
+     * @param  list<ModelData>  $models
+     * @return list<PolicyData>
+     */
+    private function discoverPolicies(array $models, DiscoveryContext $context): array
+    {
+        if (! $context->discoverHttp) {
+            return [];
+        }
+
+        try {
+            return $this->policyDiscoverer->discover(
+                array_map(static fn (ModelData $model): string => $model->class, $models),
+                $context,
+            );
+        } catch (Throwable $exception) {
+            $this->warnings[] = new DiscoveryWarning(
+                type: 'policy_discovery_failed',
+                message: sprintf('Policy discovery failed: %s', $exception->getMessage()),
+                exceptionClass: $exception::class,
+            );
+
+            return [];
+        } finally {
+            $this->drainWarnings($this->policyDiscoverer);
+        }
+    }
+
+    /**
+     * Models referenced by routes and controllers take part in the graph
+     * even when they live outside the configured model paths.
+     *
+     * @param  array<string, ModelData>  $models
+     * @param  list<string>  $classes
+     * @return array<string, ModelData>
+     */
+    private function addModelClasses(array $models, array $classes, DiscoveryContext $context): array
+    {
+        foreach ($classes as $class) {
+            if (isset($models[StableIdentifier::model($class)])) {
+                continue;
+            }
+
+            $model = $this->discoverSingleClass($class, $context);
+
+            if ($model !== null) {
+                $models[$model->id] = $model;
+            }
+        }
+
+        return $models;
     }
 
     /**
@@ -373,6 +470,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         array $relations,
         array $resources,
         array $livewireComponents,
+        HttpMapData $http,
     ): array {
         $warnings = $this->warnings;
 
@@ -417,10 +515,44 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
             }
         }
 
+        foreach ($this->httpWarnings($http) as [$type, $class, $message]) {
+            $warnings[] = new DiscoveryWarning(type: $type, message: $message, class: $class);
+        }
+
         usort($warnings, static function (DiscoveryWarning $a, DiscoveryWarning $b): int {
             return [$a->type, $a->class ?? '', $a->method ?? '', $a->message]
                 <=> [$b->type, $b->class ?? '', $b->method ?? '', $b->message];
         });
+
+        return $warnings;
+    }
+
+    /**
+     * @return list<array{0: string, 1: string, 2: string}> Type, class and message.
+     */
+    private function httpWarnings(HttpMapData $http): array
+    {
+        $warnings = [];
+
+        $groups = [
+            'route_discovery' => $http->routes,
+            'controller_discovery' => $http->controllers,
+            'form_request_discovery' => $http->formRequests,
+            'policy_discovery' => $http->policies,
+            'event_discovery' => $http->events,
+            'listener_discovery' => $http->listeners,
+            'dispatchable_discovery' => $http->dispatchables,
+        ];
+
+        foreach ($groups as $type => $items) {
+            foreach ($items as $item) {
+                $subject = $item instanceof RouteData ? $item->label() : $item->class;
+
+                foreach ($item->warnings as $message) {
+                    $warnings[] = [$type, $subject, $message];
+                }
+            }
+        }
 
         return $warnings;
     }
@@ -439,6 +571,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
         array $resources,
         array $panels,
         array $livewireComponents,
+        HttpMapData $http,
     ): string {
         $payload = json_encode([
             'context' => $context->toArray(),
@@ -450,6 +583,7 @@ final class LaravelApplicationDiscoverer implements ApplicationDiscovery
                 static fn (LivewireComponentData $component): array => $component->toArray(),
                 $livewireComponents,
             ),
+            'http' => $http->toArray(),
         ]);
 
         return sha1($payload === false ? '' : $payload);
